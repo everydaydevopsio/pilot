@@ -1,0 +1,17 @@
+[Unit]
+Description=AI Agent Browser service for display %i
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /opt/aab/dist/index.js \
+  --port 876%i \
+  --cdp-port 922%i
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aab@%i
+
+[Install]
+WantedBy=multi-user.target

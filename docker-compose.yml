@@ -1,0 +1,40 @@
+services:
+  app:
+    build: .
+    tty: true
+    environment:
+      - AAB_HOST=0.0.0.0
+      - AAB_PORT=8765
+      - AAB_CDP_HOST=chrome
+      - AAB_CDP_PORT=9222
+      - NODE_ENV=production
+    ports:
+      - '8765:8765'
+    depends_on:
+      chrome:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: src/
+          target: /app/src
+        - action: rebuild
+          path: package.json
+    command: pnpm run dev
+
+  chrome:
+    image: zenika/alpine-chrome:latest
+    command:
+      - --no-sandbox
+      - --headless=new
+      - --disable-gpu
+      - --remote-debugging-address=0.0.0.0
+      - --remote-debugging-port=9222
+      - about:blank
+    ports:
+      - '9222:9222'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:9222/json/version']
+      interval: 2s
+      timeout: 5s
+      retries: 10

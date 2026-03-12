@@ -55,11 +55,11 @@ the VNC stream.
 
 ## Users and consumers
 
-| Consumer | How they use aab |
-|---|---|
-| AI agent (Claude, Codex, etc.) | Connects via WS, sends commands, reads events |
-| `ai-agent-desktop-manager` | Starts/stops the service; returns `aabUrl` to the caller |
-| Human operator | Calls `/health` to verify the service is up; reads logs |
+| Consumer                       | How they use aab                                         |
+| ------------------------------ | -------------------------------------------------------- |
+| AI agent (Claude, Codex, etc.) | Connects via WS, sends commands, reads events            |
+| `ai-agent-desktop-manager`     | Starts/stops the service; returns `aabUrl` to the caller |
+| Human operator                 | Calls `/health` to verify the service is up; reads logs  |
 
 ---
 
@@ -138,19 +138,19 @@ Capture the current viewport.
 
 **Params**
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `format` | `"png"` \| `"jpeg"` | `"png"` | Image format |
-| `quality` | number (1–100) | 80 | JPEG quality (ignored for PNG) |
-| `fullPage` | boolean | false | Capture full scrollable page |
+| Field      | Type                | Default | Description                    |
+| ---------- | ------------------- | ------- | ------------------------------ |
+| `format`   | `"png"` \| `"jpeg"` | `"png"` | Image format                   |
+| `quality`  | number (1–100)      | 80      | JPEG quality (ignored for PNG) |
+| `fullPage` | boolean             | false   | Capture full scrollable page   |
 
 **Result**
 
-| Field | Type | Description |
-|---|---|---|
+| Field     | Type   | Description                 |
+| --------- | ------ | --------------------------- |
 | `dataUrl` | string | `data:<mime>;base64,<data>` |
-| `width` | number | Pixel width |
-| `height` | number | Pixel height |
+| `width`   | number | Pixel width                 |
+| `height`  | number | Pixel height                |
 
 ---
 
@@ -160,17 +160,17 @@ Navigate the active page to a URL.
 
 **Params**
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `url` | string | yes | Target URL |
-| `waitUntil` | `"load"` \| `"domcontentloaded"` \| `"networkidle"` | no | Default: `"load"` |
-| `timeoutMs` | number | no | Default: 30000 |
+| Field       | Type                                                | Required | Description       |
+| ----------- | --------------------------------------------------- | -------- | ----------------- |
+| `url`       | string                                              | yes      | Target URL        |
+| `waitUntil` | `"load"` \| `"domcontentloaded"` \| `"networkidle"` | no       | Default: `"load"` |
+| `timeoutMs` | number                                              | no       | Default: 30000    |
 
 **Result**
 
-| Field | Type | Description |
-|---|---|---|
-| `url` | string | Final URL after redirects |
+| Field    | Type   | Description                            |
+| -------- | ------ | -------------------------------------- |
+| `url`    | string | Final URL after redirects              |
 | `status` | number | HTTP status of the main frame response |
 
 ---
@@ -181,21 +181,21 @@ Click an element or coordinates.
 
 **Params** (one of `selector` or `x`/`y` required)
 
-| Field | Type | Description |
-|---|---|---|
-| `selector` | string | CSS selector |
-| `x` | number | Viewport X coordinate |
-| `y` | number | Viewport Y coordinate |
-| `button` | `"left"` \| `"right"` \| `"middle"` | Default: `"left"` |
-| `clickCount` | number | Default: 1 |
-| `timeoutMs` | number | Timeout waiting for selector. Default: 5000 |
+| Field        | Type                                | Description                                 |
+| ------------ | ----------------------------------- | ------------------------------------------- |
+| `selector`   | string                              | CSS selector                                |
+| `x`          | number                              | Viewport X coordinate                       |
+| `y`          | number                              | Viewport Y coordinate                       |
+| `button`     | `"left"` \| `"right"` \| `"middle"` | Default: `"left"`                           |
+| `clickCount` | number                              | Default: 1                                  |
+| `timeoutMs`  | number                              | Timeout waiting for selector. Default: 5000 |
 
 **Result**
 
-| Field | Type | Description |
-|---|---|---|
-| `x` | number | Actual click X |
-| `y` | number | Actual click Y |
+| Field | Type   | Description    |
+| ----- | ------ | -------------- |
+| `x`   | number | Actual click X |
+| `y`   | number | Actual click Y |
 
 ---
 
@@ -205,12 +205,12 @@ Type text into the focused element or a given selector.
 
 **Params**
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `text` | string | yes | Text to type |
-| `selector` | string | no | Focus this element first |
-| `clearFirst` | boolean | no | Select-all + delete before typing. Default: false |
-| `delayMs` | number | no | Delay between keystrokes (ms). Default: 0 |
+| Field        | Type    | Required | Description                                       |
+| ------------ | ------- | -------- | ------------------------------------------------- |
+| `text`       | string  | yes      | Text to type                                      |
+| `selector`   | string  | no       | Focus this element first                          |
+| `clearFirst` | boolean | no       | Select-all + delete before typing. Default: false |
+| `delayMs`    | number  | no       | Delay between keystrokes (ms). Default: 0         |
 
 **Result**
 
@@ -226,18 +226,18 @@ Execute JavaScript in the page context.
 
 **Params**
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `expression` | string | yes | JS expression to evaluate |
-| `awaitPromise` | boolean | no | Await if result is a Promise. Default: true |
-| `timeoutMs` | number | no | Default: 10000 |
+| Field          | Type    | Required | Description                                 |
+| -------------- | ------- | -------- | ------------------------------------------- |
+| `expression`   | string  | yes      | JS expression to evaluate                   |
+| `awaitPromise` | boolean | no       | Await if result is a Promise. Default: true |
+| `timeoutMs`    | number  | no       | Default: 10000                              |
 
 **Result**
 
-| Field | Type | Description |
-|---|---|---|
-| `value` | any | JSON-serializable return value |
-| `type` | string | CDP `RemoteObject.type` |
+| Field   | Type   | Description                    |
+| ------- | ------ | ------------------------------ |
+| `value` | any    | JSON-serializable return value |
+| `type`  | string | CDP `RemoteObject.type`        |
 
 ---
 
@@ -247,13 +247,13 @@ Wait for a condition before responding.
 
 **Params** (one of the following must be set)
 
-| Field | Type | Description |
-|---|---|---|
-| `selector` | string | Wait until selector is present in DOM |
-| `selectorVisible` | string | Wait until selector is visible (non-zero bounding box) |
-| `networkIdle` | boolean | Wait until no network requests for 500 ms |
-| `ms` | number | Fixed delay in milliseconds |
-| `timeoutMs` | number | Overall timeout. Default: 10000 |
+| Field             | Type    | Description                                            |
+| ----------------- | ------- | ------------------------------------------------------ |
+| `selector`        | string  | Wait until selector is present in DOM                  |
+| `selectorVisible` | string  | Wait until selector is visible (non-zero bounding box) |
+| `networkIdle`     | boolean | Wait until no network requests for 500 ms              |
+| `ms`              | number  | Fixed delay in milliseconds                            |
+| `timeoutMs`       | number  | Overall timeout. Default: 10000                        |
 
 **Result**
 
@@ -271,10 +271,10 @@ Return current page metadata.
 
 **Result**
 
-| Field | Type | Description |
-|---|---|---|
-| `url` | string | Current URL |
-| `title` | string | Page title |
+| Field        | Type   | Description           |
+| ------------ | ------ | --------------------- |
+| `url`        | string | Current URL           |
+| `title`      | string | Page title            |
 | `readyState` | string | `document.readyState` |
 
 ---
@@ -414,15 +414,15 @@ check and human spot-checking. No JSON body.
 
 All configuration via environment variables or CLI flags (CLI flags take precedence).
 
-| Env var | CLI flag | Default | Description |
-|---|---|---|---|
-| `AAB_PORT` | `--port` | `8765` | HTTP/WS listen port |
-| `AAB_HOST` | `--host` | `127.0.0.1` | Bind address |
-| `AAB_CDP_PORT` | `--cdp-port` | `9222` | Chrome DevTools Protocol port |
-| `AAB_CDP_HOST` | `--cdp-host` | `127.0.0.1` | CDP host |
-| `AAB_CDP_RETRY_MS` | — | `2000` | Initial CDP reconnect interval |
-| `AAB_CDP_MAX_RETRY_MS` | — | `30000` | Max CDP reconnect interval |
-| `AAB_LOG_LEVEL` | `--log-level` | `info` | Pino log level |
+| Env var                | CLI flag      | Default     | Description                    |
+| ---------------------- | ------------- | ----------- | ------------------------------ |
+| `AAB_PORT`             | `--port`      | `8765`      | HTTP/WS listen port            |
+| `AAB_HOST`             | `--host`      | `127.0.0.1` | Bind address                   |
+| `AAB_CDP_PORT`         | `--cdp-port`  | `9222`      | Chrome DevTools Protocol port  |
+| `AAB_CDP_HOST`         | `--cdp-host`  | `127.0.0.1` | CDP host                       |
+| `AAB_CDP_RETRY_MS`     | —             | `2000`      | Initial CDP reconnect interval |
+| `AAB_CDP_MAX_RETRY_MS` | —             | `30000`     | Max CDP reconnect interval     |
+| `AAB_LOG_LEVEL`        | `--log-level` | `info`      | Pino log level                 |
 
 ---
 
@@ -445,27 +445,27 @@ env vars.)
 
 ## Error handling
 
-| Scenario | Behavior |
-|---|---|
-| Chrome not reachable on startup | Retry with backoff; log each attempt; service stays up |
-| Command times out | Respond `{ ok: false, error: "timeout" }` |
-| Unknown method | Respond `{ ok: false, error: "unknown_method" }` |
-| Second WS connection attempt | Close with code `4409`, message `"session_conflict"` |
-| Chrome crashes during command | Respond `{ ok: false, error: "browser_disconnected" }` and emit event |
-| Malformed JSON from client | Close WS with code `4400`, message `"invalid_json"` |
+| Scenario                        | Behavior                                                              |
+| ------------------------------- | --------------------------------------------------------------------- |
+| Chrome not reachable on startup | Retry with backoff; log each attempt; service stays up                |
+| Command times out               | Respond `{ ok: false, error: "timeout" }`                             |
+| Unknown method                  | Respond `{ ok: false, error: "unknown_method" }`                      |
+| Second WS connection attempt    | Close with code `4409`, message `"session_conflict"`                  |
+| Chrome crashes during command   | Respond `{ ok: false, error: "browser_disconnected" }` and emit event |
+| Malformed JSON from client      | Close WS with code `4400`, message `"invalid_json"`                   |
 
 ---
 
 ## Non-functional requirements
 
-| Requirement | Target |
-|---|---|
-| Screenshot latency (viewport) | < 500 ms p95 |
+| Requirement                      | Target                          |
+| -------------------------------- | ------------------------------- |
+| Screenshot latency (viewport)    | < 500 ms p95                    |
 | Navigate + screenshot round-trip | < 3 s p95 (excluding page load) |
-| Memory footprint | < 100 MB RSS at idle |
-| Startup time (Chrome reachable) | < 2 s |
-| Node.js version | 20 LTS |
-| TypeScript strict mode | required |
+| Memory footprint                 | < 100 MB RSS at idle            |
+| Startup time (Chrome reachable)  | < 2 s                           |
+| Node.js version                  | 20 LTS                          |
+| TypeScript strict mode           | required                        |
 
 ---
 
@@ -504,13 +504,13 @@ ai-agent-browser/
 
 ## Dependencies (planned)
 
-| Package | Purpose |
-|---|---|
-| `fastify` | HTTP server (consistent with desktop manager) |
-| `@fastify/websocket` | WebSocket upgrade via ws |
-| `chrome-remote-interface` | CDP client |
-| `pino` | Structured logging |
-| `zod` | Command parameter validation |
+| Package                   | Purpose                                       |
+| ------------------------- | --------------------------------------------- |
+| `fastify`                 | HTTP server (consistent with desktop manager) |
+| `@fastify/websocket`      | WebSocket upgrade via ws                      |
+| `chrome-remote-interface` | CDP client                                    |
+| `pino`                    | Structured logging                            |
+| `zod`                     | Command parameter validation                  |
 
 ---
 

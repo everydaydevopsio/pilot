@@ -1,0 +1,30 @@
+services:
+  chrome:
+    image: zenika/alpine-chrome:latest
+    command:
+      - --no-sandbox
+      - --headless=new
+      - --disable-gpu
+      - --remote-debugging-address=0.0.0.0
+      - --remote-debugging-port=9222
+      - about:blank
+    ports:
+      - '9333:9222'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:9222/json/version']
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    environment:
+      - E2E_CDP_PORT=9222
+      - E2E_CDP_HOST=chrome
+      - E2E_AAB_PORT=8866
+    depends_on:
+      chrome:
+        condition: service_healthy
+    network_mode: host
