@@ -10,12 +10,12 @@ A lightweight Node.js/TypeScript service that gives AI agents DevTools-grade con
 
 ## Prerequisites
 
-- **Node.js**: Use the version in `.nvmrc`. Supported: Node 22 (LTS) or 24 (Active LTS).
+- **Node.js**: Use the version in `.nvmrc`. Supported: Node 20 (LTS) or later.
 - [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager)
 - [pnpm](https://pnpm.io) package manager
 
 ```bash
-nvm install   # installs the version from .nvmrc (Node 24)
+nvm install   # installs the version from .nvmrc (Node 20)
 nvm use
 pnpm install
 ```
@@ -137,7 +137,10 @@ src/
 ├── server.ts          # Fastify HTTP + WS server
 ├── session.ts         # Single-session WS handler
 ├── browser.ts         # CDP connection + reconnect logic
-├── commands/          # Command implementations
+├── cli/               # CLI commands
+│   ├── init.ts        # Init command (creates skill)
+│   └── skill-template.ts  # SKILL.md template
+├── commands/          # WebSocket command implementations
 │   ├── screenshot.ts
 │   ├── navigate.ts
 │   ├── click.ts
@@ -145,9 +148,131 @@ src/
 │   ├── evaluate.ts
 │   ├── wait.ts
 │   └── page_info.ts
+├── mcp/               # MCP server for Claude Code
+│   ├── index.ts       # MCP entry point (stdio)
+│   ├── server.ts      # MCP server setup
+│   ├── ws-client.ts   # WebSocket client
+│   ├── console-buffer.ts  # Console message buffer
+│   └── tools/
+│       ├── browser.ts # Browser control tools
+│       └── errors.ts  # Error monitoring tools
 └── util/
     ├── config.ts      # Configuration loading
     └── logger.ts      # Pino logger setup
+```
+
+## MCP Server (Claude Code Integration)
+
+The MCP server allows Claude Code to control the browser directly via MCP tools. It connects to the ai-agent-browser WebSocket API and exposes browser control and error monitoring tools.
+
+### Setup
+
+1. Build the project: `pnpm run build`
+2. Start ai-agent-browser: `pnpm start`
+3. Add to Claude Code:
+
+```bash
+claude mcp add ai-agent-browser -- node /path/to/ai-agent-browser/dist/mcp/index.js
+```
+
+Or add to your project's `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "ai-agent-browser": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["dist/mcp/index.js"],
+      "env": {
+        "AAB_WS_URL": "ws://127.0.0.1:8765/ws"
+      }
+    }
+  }
+}
+```
+
+### MCP Tools
+
+**Browser Control:**
+
+| Tool                 | Description                                     |
+| -------------------- | ----------------------------------------------- |
+| `browser_screenshot` | Capture viewport or full page screenshot        |
+| `browser_navigate`   | Navigate to URL and wait for load               |
+| `browser_click`      | Click element by CSS selector or coordinates    |
+| `browser_type`       | Type text into focused element or selector      |
+| `browser_evaluate`   | Execute JavaScript and return result            |
+| `browser_wait`       | Wait for selector, network idle, or fixed delay |
+| `browser_page_info`  | Get current URL, title, and ready state         |
+
+**Error Monitoring:**
+
+| Tool                       | Description                                  |
+| -------------------------- | -------------------------------------------- |
+| `browser_get_console_logs` | Get buffered console messages with filters   |
+| `browser_get_errors`       | Get console errors (and optionally warnings) |
+| `browser_clear_errors`     | Clear the console message buffer             |
+
+### Error Watching Workflow
+
+1. Ask Claude: "Watch for errors while I test the checkout flow"
+2. Claude clears the error buffer and tells you to proceed
+3. You interact with the app in Chrome
+4. Claude periodically checks for errors and can fix them in your source code
+
+### MCP Configuration
+
+| Env var               | Default                  | Description             |
+| --------------------- | ------------------------ | ----------------------- |
+| `AAB_WS_URL`          | `ws://127.0.0.1:8765/ws` | ai-agent-browser WS URL |
+| `AAB_MCP_BUFFER_SIZE` | `1000`                   | Console message buffer  |
+
+## Claude Code Skill
+
+The `init` command creates a Claude Code skill in your project that automates the entire browser debugging workflow.
+
+### Initialize the Skill
+
+```bash
+# Using npx (no installation required)
+npx ai-agent-browser init
+
+# If installed globally
+aab init
+
+# Overwrite existing skill
+aab init --force
+```
+
+This creates `.claude/skills/debug-browser/SKILL.md` in your project.
+
+### Using the Skill
+
+In Claude Code, say **"debug in browser"** or use **/debug-browser**. The skill will:
+
+1. Detect your OS (macOS, Linux, Windows)
+2. Start Chrome with `--remote-debugging-port=9222`
+3. Launch ai-agent-browser service
+4. Add the MCP server to your Claude Code session
+5. Spawn a background sub-agent to watch for console errors
+
+### Example Session
+
+```
+You: "debug in browser"
+
+Claude: [Detects macOS, starts Chrome, starts ai-agent-browser, adds MCP]
+        "Browser debugging environment ready! Navigate to your app and I'll watch for errors."
+
+You: "go to localhost:3000"
+
+Claude: [Uses browser_navigate to go to http://localhost:3000]
+
+[You interact with the app, a JavaScript error occurs]
+
+Claude: "Error detected: TypeError: Cannot read property 'map' of undefined at App.tsx:42"
+        [Reads the file, analyzes the bug, suggests a fix]
 ```
 
 ## Systemd Service

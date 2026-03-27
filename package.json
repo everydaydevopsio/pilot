@@ -5,7 +5,10 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "aab": "dist/index.js"
+    "aab": "dist/index.js",
+    "aab-mcp": "dist/mcp/index.js",
+    "ai-agent-browser": "dist/index.js",
+    "ai-agent-browser-mcp": "dist/mcp/index.js"
   },
   "scripts": {
     "build": "rimraf ./dist && tsc",
@@ -31,14 +34,16 @@
   "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   },
   "packageManager": "pnpm@9.0.0",
   "dependencies": {
     "@fastify/websocket": "^11.2.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "chrome-remote-interface": "^0.34.0",
     "fastify": "^5.8.2",
     "pino": "^10.3.1",
+    "ws": "^8.19.0",
     "zod": "^4.3.6"
   },
   "lint-staged": {
@@ -75,7 +80,6 @@
     "tsc-files": "^1.1.4",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.0",
-    "ws": "^8.19.0"
+    "typescript-eslint": "^8.57.0"
   }
 }
