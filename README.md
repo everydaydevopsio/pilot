@@ -3,6 +3,7 @@
 [![CI](https://github.com/markcallen/ai-agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/markcallen/ai-agent-browser/actions/workflows/ci.yml)
 [![Lint](https://github.com/markcallen/ai-agent-browser/actions/workflows/lint.yml/badge.svg)](https://github.com/markcallen/ai-agent-browser/actions/workflows/lint.yml)
 [![E2E](https://github.com/markcallen/ai-agent-browser/actions/workflows/e2e.yml/badge.svg)](https://github.com/markcallen/ai-agent-browser/actions/workflows/e2e.yml)
+[![Smoke](https://github.com/markcallen/ai-agent-browser/actions/workflows/smoke.yml/badge.svg)](https://github.com/markcallen/ai-agent-browser/actions/workflows/smoke.yml)
 [![License](https://img.shields.io/github/license/markcallen/ai-agent-browser)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/markcallen/ai-agent-browser)](https://github.com/markcallen/ai-agent-browser/releases)
 
@@ -10,14 +11,19 @@ A lightweight Node.js/TypeScript service that gives AI agents DevTools-grade con
 
 ## Prerequisites
 
-- **Node.js**: Use the version in `.nvmrc`. Supported: Node 20 (LTS) or later.
+- **Node.js**: Use the version in `.nvmrc`. Supported: Node 22 (LTS) or 24 (Active LTS).
 - [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager)
 - [pnpm](https://pnpm.io) package manager
+- [pre-commit](https://pre-commit.com) for Git hooks (optional but recommended)
 
 ```bash
-nvm install   # installs the version from .nvmrc (Node 20)
+nvm install   # installs the version from .nvmrc (Node 24)
 nvm use
 pnpm install
+
+# Optional: Install Git hooks
+pre-commit install
+pre-commit install --hook-type pre-push
 ```
 
 ## Quick Start
@@ -35,15 +41,26 @@ pnpm run dev
 
 ### With Docker Compose
 
+Using Make (recommended):
+
 ```bash
-docker compose build
-docker compose up
+make up          # Build and start the production stack
+make down        # Stop the stack
+make logs        # Follow logs
+
+make up-local    # Build and start with hot reload (dev mode)
+make down-local  # Stop the dev stack
+make logs-local  # Follow dev logs
 ```
 
-For local development with hot reload:
+Or using Docker Compose directly:
 
 ```bash
-docker compose up --watch
+# Production stack
+docker compose up --build
+
+# Development with hot reload
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build --watch
 ```
 
 ## Configuration
@@ -119,7 +136,7 @@ Connect to `ws://127.0.0.1:8765/ws`. All messages are JSON text frames.
 # Unit tests
 pnpm run test
 
-# With coverage
+# With coverage (50% threshold enforced)
 pnpm run test:coverage
 
 # E2E tests (requires Chrome installed)
@@ -127,6 +144,9 @@ pnpm run test:e2e
 
 # E2E tests via Docker (no local Chrome needed)
 pnpm run test:e2e:docker
+
+# Smoke test (builds Docker image and tests health endpoint)
+pnpm run test:smoke
 ```
 
 ## Project Structure

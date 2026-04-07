@@ -13,14 +13,6 @@ services:
     depends_on:
       chrome:
         condition: service_healthy
-    develop:
-      watch:
-        - action: sync+restart
-          path: src/
-          target: /app/src
-        - action: rebuild
-          path: package.json
-    command: pnpm run dev
 
   chrome:
     image: zenika/alpine-chrome:latest
