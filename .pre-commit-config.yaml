@@ -3,19 +3,17 @@ repos:
     hooks:
       - id: prettier
         name: prettier
-        entry: pnpm run prettier:fix
+        entry: pnpm exec prettier --write
         language: system
         types: [text]
         files: \.(js|ts|json|md|yaml|yml)$
-        pass_filenames: false
 
       - id: eslint
         name: eslint
-        entry: pnpm run lint:fix
+        entry: pnpm exec eslint --fix
         language: system
         types: [text]
         files: \.(js|ts)$
-        pass_filenames: false
 
       - id: typecheck
         name: typecheck

@@ -19,11 +19,16 @@ jobs:
       - name: Run smoke test
         run: ./scripts/smoke-test.sh
 
+      - name: Capture docker logs on failure
+        if: failure()
+        run: |
+          mkdir -p /tmp/docker-logs
+          docker compose logs > /tmp/docker-logs/compose.log 2>&1 || true
+
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: docker-logs
-          path: |
-            /tmp/docker-logs/
+          path: /tmp/docker-logs/
           retention-days: 7

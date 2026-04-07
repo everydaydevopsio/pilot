@@ -47,7 +47,7 @@ echo "Health response: $HEALTH_RESPONSE"
 
 # Test screenshot endpoint (should return error without browser, but endpoint should exist)
 echo "Testing screenshot endpoint exists..."
-SCREENSHOT_CODE=$(curl -sf -o /dev/null -w "%{http_code}" "$APP_URL/screenshot" || echo "000")
+SCREENSHOT_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$APP_URL/screenshot")
 if [ "$SCREENSHOT_CODE" = "000" ]; then
   echo "SMOKE TEST FAILED: Screenshot endpoint unreachable"
   exit 1
