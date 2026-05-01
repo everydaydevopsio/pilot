@@ -8,11 +8,15 @@
     "publishing",
     "linting",
     "logging",
-    "testing"
+    "testing",
+    "git-hooks",
+    "tasks"
   ],
-  "ballastVersion": "5.4.2",
+  "ballastVersion": "5.9.2",
+  "skills": ["github-health-check", "owasp-security-scan"],
   "languages": ["typescript"],
   "paths": {
     "typescript": ["."]
-  }
+  },
+  "taskSystem": "github"
 }
