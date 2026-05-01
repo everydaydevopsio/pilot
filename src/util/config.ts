@@ -9,7 +9,10 @@ const ConfigSchema = z.object({
   cdpMaxRetryMs: z.number().int().min(1000).default(30000),
   logLevel: z
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
-    .default('info')
+    .default('info'),
+  launchChrome: z.boolean().default(true),
+  chromePath: z.string().optional(),
+  headless: z.boolean().default(true)
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -20,6 +23,9 @@ export interface CliArgs {
   cdpPort?: number;
   cdpHost?: string;
   logLevel?: string;
+  launchChrome?: boolean;
+  chromePath?: string;
+  headless?: boolean;
 }
 
 export function loadConfig(cliArgs: CliArgs = {}): Config {
@@ -36,7 +42,16 @@ export function loadConfig(cliArgs: CliArgs = {}): Config {
     cdpMaxRetryMs: process.env.AAB_CDP_MAX_RETRY_MS
       ? parseInt(process.env.AAB_CDP_MAX_RETRY_MS, 10)
       : undefined,
-    logLevel: process.env.AAB_LOG_LEVEL
+    logLevel: process.env.AAB_LOG_LEVEL,
+    launchChrome:
+      process.env.AAB_LAUNCH_CHROME !== undefined
+        ? process.env.AAB_LAUNCH_CHROME !== 'false'
+        : undefined,
+    chromePath: process.env.AAB_CHROME_PATH,
+    headless:
+      process.env.AAB_HEADLESS !== undefined
+        ? process.env.AAB_HEADLESS !== 'false'
+        : undefined
   };
 
   const merged = {
@@ -46,7 +61,10 @@ export function loadConfig(cliArgs: CliArgs = {}): Config {
     cdpHost: cliArgs.cdpHost ?? env.cdpHost,
     cdpRetryMs: env.cdpRetryMs,
     cdpMaxRetryMs: env.cdpMaxRetryMs,
-    logLevel: cliArgs.logLevel ?? env.logLevel
+    logLevel: cliArgs.logLevel ?? env.logLevel,
+    launchChrome: cliArgs.launchChrome ?? env.launchChrome,
+    chromePath: cliArgs.chromePath ?? env.chromePath,
+    headless: cliArgs.headless ?? env.headless
   };
 
   return ConfigSchema.parse(merged);
