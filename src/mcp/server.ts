@@ -1,38 +1,67 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { WSClient } from './ws-client.js';
-import { ConsoleBuffer, ConsoleMessage } from './console-buffer.js';
+import { BrowserManager } from '../browser.js';
+import { loadConfig } from '../util/config.js';
+import { ConsoleBuffer, type ConsoleMessage } from './console-buffer.js';
 import { registerBrowserTools } from './tools/browser.js';
 import { registerErrorTools } from './tools/errors.js';
 
 export interface McpConfig {
-  wsUrl: string;
   bufferSize: number;
+  cdpPort?: number;
+  cdpHost?: string;
 }
 
-export async function createMcpServer(config: McpConfig): Promise<McpServer> {
+export interface BrowserContext {
+  manager: BrowserManager | null;
+  consoleBuffer: ConsoleBuffer;
+  baseConfig: McpConfig;
+}
+
+export async function createMcpServer(config: McpConfig): Promise<{
+  server: McpServer;
+  cleanup: () => Promise<void>;
+}> {
   const server = new McpServer({
     name: 'ai-agent-browser',
     version: '0.1.0'
   });
 
-  const wsClient = new WSClient(config.wsUrl);
   const consoleBuffer = new ConsoleBuffer(config.bufferSize);
 
-  // Subscribe to console_message events before connecting
-  wsClient.onEvent((event, data) => {
-    if (event === 'console_message') {
-      consoleBuffer.push(data as ConsoleMessage);
-    }
-  });
+  const context: BrowserContext = {
+    manager: null,
+    consoleBuffer,
+    baseConfig: config
+  };
 
-  // Connect to ai-agent-browser WebSocket
-  await wsClient.connect();
+  function attachConsoleBuffer(manager: BrowserManager): void {
+    manager.setEventCallback((event, data) => {
+      if (event === 'console_message') {
+        consoleBuffer.push(data as ConsoleMessage);
+      }
+    });
+  }
 
-  // Register browser control tools
-  registerBrowserTools(server, wsClient);
+  function makeBrowserManager(): BrowserManager {
+    const browserConfig = loadConfig({
+      cdpPort: config.cdpPort,
+      cdpHost: config.cdpHost
+    });
+    const manager = new BrowserManager(browserConfig);
+    attachConsoleBuffer(manager);
+    return manager;
+  }
 
-  // Register error monitoring tools
+  registerBrowserTools(server, context, makeBrowserManager);
   registerErrorTools(server, consoleBuffer);
 
-  return server;
+  return {
+    server,
+    cleanup: async () => {
+      if (context.manager) {
+        await context.manager.destroy();
+        context.manager = null;
+      }
+    }
+  };
 }

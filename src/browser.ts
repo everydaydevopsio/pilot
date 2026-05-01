@@ -1,5 +1,10 @@
 import CDP from 'chrome-remote-interface';
 import type { Client } from 'chrome-remote-interface';
+import { spawn, type ChildProcess } from 'child_process';
+import { existsSync, mkdtempSync } from 'fs';
+import * as net from 'net';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { getLogger } from './util/logger.js';
 import type { Config } from './util/config.js';
 
@@ -10,6 +15,11 @@ export interface BrowserState {
   targetId: string | null;
   url: string | null;
   connected: boolean;
+}
+
+export interface LaunchOptions {
+  headless?: boolean;
+  chromePath?: string;
 }
 
 export class BrowserManager {
@@ -23,6 +33,9 @@ export class BrowserManager {
   private pendingNetworkRequests = new Set<string>();
   private networkIdleTimer: ReturnType<typeof setTimeout> | null = null;
   private networkIdleResolvers: Array<() => void> = [];
+  private chromeProcess: ChildProcess | null = null;
+  private launchedCdpPort: number | null = null;
+  private launchedUserDataDir: string | null = null;
 
   constructor(private readonly config: Config) {
     this.retryMs = config.cdpRetryMs;
@@ -53,15 +66,138 @@ export class BrowserManager {
     return this.client !== null;
   }
 
+  isLaunched(): boolean {
+    return this.chromeProcess !== null;
+  }
+
+  static findChromeExecutable(override?: string): string {
+    if (override) return override;
+    const env = process.env.AAB_CHROME_PATH;
+    if (env) return env;
+
+    const platform = process.platform;
+    const candidates: string[] =
+      platform === 'darwin'
+        ? [
+            '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+            '/Applications/Chromium.app/Contents/MacOS/Chromium'
+          ]
+        : platform === 'linux'
+          ? [
+              '/usr/bin/google-chrome-stable',
+              '/usr/bin/google-chrome',
+              '/usr/bin/chromium-browser',
+              '/usr/bin/chromium',
+              '/snap/bin/chromium'
+            ]
+          : platform === 'win32'
+            ? [
+                'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+                'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+              ]
+            : [];
+
+    for (const p of candidates) {
+      if (existsSync(p)) return p;
+    }
+    throw new Error(
+      `Chrome not found on ${platform}. Install Google Chrome or set AAB_CHROME_PATH.`
+    );
+  }
+
+  static async findFreePort(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const server = net.createServer();
+      server.listen(0, '127.0.0.1', () => {
+        const { port } = server.address() as net.AddressInfo;
+        server.close(() => resolve(port));
+      });
+      server.on('error', reject);
+    });
+  }
+
+  async launch(opts: LaunchOptions = {}): Promise<void> {
+    if (this.chromeProcess) {
+      throw new Error('Chrome is already launched');
+    }
+    if (this.destroyed) {
+      throw new Error(
+        'BrowserManager has been destroyed; create a new instance'
+      );
+    }
+
+    const logger = getLogger();
+    const port = await BrowserManager.findFreePort();
+    const chromePath = BrowserManager.findChromeExecutable(opts.chromePath);
+    const userDataDir = mkdtempSync(join(tmpdir(), 'aab-chrome-'));
+
+    const args = [
+      `--remote-debugging-port=${port}`,
+      `--user-data-dir=${userDataDir}`,
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-default-apps',
+      '--disable-extensions'
+    ];
+
+    if (opts.headless ?? false) {
+      args.push('--headless=new', '--disable-gpu');
+    }
+
+    if (process.platform === 'linux') {
+      args.push('--no-sandbox', '--disable-dev-shm-usage');
+    }
+
+    logger.info(
+      { chromePath, port, headless: opts.headless ?? false },
+      'Launching Chrome'
+    );
+
+    this.chromeProcess = spawn(chromePath, args, {
+      stdio: 'ignore',
+      detached: false
+    });
+
+    this.launchedCdpPort = port;
+    this.launchedUserDataDir = userDataDir;
+
+    this.chromeProcess.on('exit', (code) => {
+      logger.warn({ code }, 'Chrome process exited');
+      this.chromeProcess = null;
+      this.launchedCdpPort = null;
+    });
+
+    await this.waitForChromeReady(port);
+    await this.connect();
+  }
+
+  private async waitForChromeReady(
+    port: number,
+    timeoutMs = 10000
+  ): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        await CDP.List({ host: '127.0.0.1', port });
+        return;
+      } catch {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
+    throw new Error(
+      `Chrome did not become ready on port ${port} within ${timeoutMs}ms`
+    );
+  }
+
   async connect(): Promise<void> {
     if (this.destroyed) return;
     const logger = getLogger();
 
     try {
-      const targets = await CDP.List({
-        host: this.config.cdpHost,
-        port: this.config.cdpPort
-      });
+      const cdpHost = this.launchedCdpPort ? '127.0.0.1' : this.config.cdpHost;
+      const cdpPort = this.launchedCdpPort ?? this.config.cdpPort;
+
+      const targets = await CDP.List({ host: cdpHost, port: cdpPort });
 
       const pageTarget = targets.find((t) => t.type === 'page');
       if (!pageTarget) {
@@ -69,8 +205,8 @@ export class BrowserManager {
       }
 
       const client = await CDP({
-        host: this.config.cdpHost,
-        port: this.config.cdpPort,
+        host: cdpHost,
+        port: cdpPort,
         target: pageTarget.id
       });
 
@@ -252,6 +388,12 @@ export class BrowserManager {
     if (this.client) {
       await this.client.close();
       this.client = null;
+    }
+    if (this.chromeProcess) {
+      this.chromeProcess.kill();
+      this.chromeProcess = null;
+      this.launchedCdpPort = null;
+      this.launchedUserDataDir = null;
     }
   }
 }
