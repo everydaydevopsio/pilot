@@ -1,7 +1,7 @@
 import CDP from 'chrome-remote-interface';
 import type { Client } from 'chrome-remote-interface';
 import { spawn, type ChildProcess } from 'child_process';
-import { existsSync, mkdtempSync } from 'fs';
+import { existsSync, mkdtempSync, rmSync } from 'fs';
 import * as net from 'net';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -165,6 +165,7 @@ export class BrowserManager {
       logger.warn({ code }, 'Chrome process exited');
       this.chromeProcess = null;
       this.launchedCdpPort = null;
+      this.cleanupUserDataDir();
     });
 
     await this.waitForChromeReady(port);
@@ -380,8 +381,18 @@ export class BrowserManager {
     this.retryTimer.unref();
   }
 
-  async destroy(): Promise<void> {
-    this.destroyed = true;
+  private cleanupUserDataDir(): void {
+    if (this.launchedUserDataDir) {
+      try {
+        rmSync(this.launchedUserDataDir, { recursive: true, force: true });
+      } catch {
+        // best-effort cleanup
+      }
+      this.launchedUserDataDir = null;
+    }
+  }
+
+  async stop(): Promise<void> {
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
       this.retryTimer = null;
@@ -394,10 +405,19 @@ export class BrowserManager {
       this.client = null;
     }
     if (this.chromeProcess) {
-      this.chromeProcess.kill();
+      try {
+        this.chromeProcess.kill();
+      } catch {
+        // process may have already exited
+      }
       this.chromeProcess = null;
       this.launchedCdpPort = null;
-      this.launchedUserDataDir = null;
+      this.cleanupUserDataDir();
     }
+  }
+
+  async destroy(): Promise<void> {
+    this.destroyed = true;
+    await this.stop();
   }
 }

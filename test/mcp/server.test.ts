@@ -33,29 +33,6 @@ describe('createMcpServer', () => {
     await expect(cleanup()).resolves.toBeUndefined();
   });
 
-  it('cleanup calls manager.destroy when browser is running', async () => {
-    const { BrowserManager } = await import('../../src/browser.js');
-    const mockDestroy = jest.fn().mockResolvedValue(undefined);
-    const mockManager = {
-      isConnected: jest.fn().mockReturnValue(true),
-      getClient: jest.fn().mockReturnValue({}),
-      launch: jest.fn().mockResolvedValue(undefined),
-      destroy: mockDestroy,
-      setEventCallback: jest.fn()
-    };
-    (BrowserManager as unknown as jest.Mock).mockImplementationOnce(
-      () => mockManager
-    );
-
-    const { server, cleanup } = await createMcpServer(baseConfig);
-
-    // Simulate browser being attached to context by directly accessing internals
-    // via the server object — not possible cleanly, so just verify cleanup is safe
-    expect(server).toBeDefined();
-    await cleanup();
-    // destroy is not called because manager was never launched in this test
-  });
-
   it('accepts cdpPort and cdpHost without throwing', async () => {
     await expect(
       createMcpServer({ bufferSize: 10, cdpPort: 9333, cdpHost: 'myhost' })

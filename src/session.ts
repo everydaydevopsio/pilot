@@ -114,7 +114,7 @@ export class Session {
         return { status: 'started' };
       }
       case 'browser_stop': {
-        await this.browser.destroy();
+        await this.browser.stop();
         return { status: 'stopped' };
       }
       case 'screenshot': {
@@ -142,8 +142,7 @@ export class Session {
         return executeWait(client!, this.browser, p);
       }
       case 'page_info': {
-        if (!client) throw new Error('browser_disconnected');
-        return executePageInfo(client);
+        return executePageInfo(client!);
       }
       default:
         throw new Error('unknown_method');

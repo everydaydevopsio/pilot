@@ -115,8 +115,8 @@ const waitShape = {
 const startShape = {
   headless: z
     .boolean()
-    .default(false)
-    .describe('Run Chrome in headless mode (default: false, shows the window)'),
+    .default(true)
+    .describe('Run Chrome headless (default: true)'),
   chromePath: z
     .string()
     .optional()
