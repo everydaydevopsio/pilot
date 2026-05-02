@@ -1,18 +1,12 @@
-FROM node:20-bookworm
+FROM node:24-bookworm
 
-# Install Chrome
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable \
+# chromium is available for both amd64 and arm64 in Debian Bookworm
+RUN apt-get update && apt-get install -y chromium \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+RUN corepack enable && corepack prepare pnpm@10 --activate
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts

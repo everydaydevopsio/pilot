@@ -1,0 +1,38 @@
+name: Smoke Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run smoke test
+        run: ./scripts/smoke-test.sh
+
+      - name: Capture docker logs on failure
+        if: failure()
+        run: |
+          mkdir -p /tmp/docker-logs
+          docker compose logs > /tmp/docker-logs/compose.log 2>&1 || true
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-logs
+          path: /tmp/docker-logs/
+          retention-days: 7

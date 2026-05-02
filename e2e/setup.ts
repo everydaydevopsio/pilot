@@ -1,10 +1,10 @@
-import { execSync, spawn, execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { createConnection } from 'node:net';
 
-const CDP_PORT = 9333;
 const AAB_PORT = 8866;
 
-export const E2E_CONFIG = { CDP_PORT, AAB_PORT };
+export const E2E_CONFIG = { AAB_PORT };
 
 function waitForPort(
   port: number,
@@ -16,7 +16,11 @@ function waitForPort(
 
     function attempt() {
       if (Date.now() > deadline) {
-        reject(new Error(`Port ${port} did not open within ${timeoutMs}ms`));
+        reject(
+          new Error(
+            `Port ${port} on ${host} did not open within ${timeoutMs}ms`
+          )
+        );
         return;
       }
       const sock = createConnection({ port, host });
@@ -33,30 +37,101 @@ function waitForPort(
   });
 }
 
-function findChromeBinary(): string {
-  const candidates = [
-    'google-chrome',
-    'google-chrome-stable',
-    'chromium',
-    'chromium-browser',
-    'chrome'
-  ];
-  for (const bin of candidates) {
-    try {
-      execFileSync('which', [bin], { stdio: 'ignore' });
-      return bin;
-    } catch {
-      // not found, try next
-    }
+/**
+ * Find a local Chrome binary. Returns null when Chrome cannot be found or
+ * when the environment is not suitable for running Chrome locally (e.g. a
+ * headless Linux CI runner without a display — use Docker instead).
+ */
+function findChromeBinary(): string | null {
+  // Explicit override — docker-compose and any manual setup can set this.
+  if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
+
+  const platform = process.platform;
+
+  if (platform === 'darwin') {
+    const candidates = [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium'
+    ];
+    return candidates.find((p) => existsSync(p)) ?? null;
   }
-  throw new Error(
-    'Chrome/Chromium not found. Install google-chrome or chromium, or run: pnpm run test:e2e:docker'
-  );
+
+  if (platform === 'win32') {
+    const local = process.env.LOCALAPPDATA ?? '';
+    const candidates = [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      local ? `${local}\\Google\\Chrome\\Application\\chrome.exe` : ''
+    ];
+    return candidates.find((p) => p && existsSync(p)) ?? null;
+  }
+
+  if (platform === 'linux') {
+    // Only run locally when a display server is available.
+    // Headless Linux (CI, SSH) should use Docker: pnpm run test:e2e:docker
+    const hasDisplay = process.env.DISPLAY ?? process.env.WAYLAND_DISPLAY;
+    if (!hasDisplay) return null;
+
+    const candidates = [
+      '/usr/bin/google-chrome-stable',
+      '/usr/bin/google-chrome',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium',
+      '/snap/bin/chromium'
+    ];
+    return candidates.find((p) => existsSync(p)) ?? null;
+  }
+
+  return null;
 }
 
 export default async function globalSetup(): Promise<void> {
-  // Start Chrome headless with remote debugging
+  const dockerCdpHost = process.env.E2E_CDP_HOST;
+  const dockerCdpPort = process.env.E2E_CDP_PORT
+    ? parseInt(process.env.E2E_CDP_PORT, 10)
+    : null;
+
+  if (dockerCdpHost && dockerCdpPort) {
+    // ── Docker mode (external Chrome) ─────────────────────────────────────
+    // Chrome is running as a separate container (healthcheck passed).
+    // Start aab pointing at it; no need to spawn or wait for Chrome here.
+    const aab = spawn(
+      'node',
+      [
+        'dist/index.js',
+        '--no-launch',
+        '--port',
+        String(AAB_PORT),
+        '--cdp-port',
+        String(dockerCdpPort),
+        '--cdp-host',
+        dockerCdpHost,
+        '--log-level',
+        'error'
+      ],
+      {
+        stdio: 'ignore',
+        env: { ...process.env, NODE_ENV: 'production' }
+      }
+    );
+
+    (globalThis as Record<string, unknown>).__E2E_AAB__ = aab;
+    await waitForPort(AAB_PORT);
+    process.env.E2E_AAB_PORT = String(AAB_PORT);
+    return;
+  }
+
+  // ── Bare-metal mode ──────────────────────────────────────────────────────
+  // Find Chrome on the local OS. Skip gracefully if unavailable.
   const chromeBin = findChromeBinary();
+  if (!chromeBin) {
+    process.env.E2E_SKIP =
+      'Chrome not available — install Chrome or run via Docker: pnpm run test:e2e:docker';
+    return;
+  }
+
+  const CDP_PORT = 9333;
+
   const chrome = spawn(
     chromeBin,
     [
@@ -68,23 +143,18 @@ export default async function globalSetup(): Promise<void> {
       '--remote-debugging-address=127.0.0.1',
       'about:blank'
     ],
-    {
-      stdio: 'ignore',
-      detached: false
-    }
+    { stdio: 'ignore', detached: false }
   );
 
   (globalThis as Record<string, unknown>).__E2E_CHROME__ = chrome;
-
-  // Wait for Chrome CDP port
   await waitForPort(CDP_PORT);
 
-  // Start aab
   const aab = spawn(
     'node',
     [
       '--experimental-vm-modules',
       'dist/index.js',
+      '--no-launch',
       '--port',
       String(AAB_PORT),
       '--cdp-port',
@@ -99,14 +169,6 @@ export default async function globalSetup(): Promise<void> {
   );
 
   (globalThis as Record<string, unknown>).__E2E_AAB__ = aab;
-
-  // Wait for aab port
   await waitForPort(AAB_PORT);
-
-  // Store config for tests
   process.env.E2E_AAB_PORT = String(AAB_PORT);
-  process.env.E2E_CDP_PORT = String(CDP_PORT);
 }
-
-void execSync; // quiet unused import warning
-void execFileSync;

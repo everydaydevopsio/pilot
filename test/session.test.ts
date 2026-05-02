@@ -86,7 +86,7 @@ describe('Session', () => {
 
     const sent = JSON.parse((ws.send as jest.Mock).mock.calls[0][0]);
     expect(sent.ok).toBe(false);
-    expect(sent.error).toBe('browser_disconnected');
+    expect(sent.error).toBe('browser_not_started');
   });
 
   it('dispatches evaluate command successfully', async () => {

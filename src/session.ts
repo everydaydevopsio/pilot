@@ -96,12 +96,27 @@ export class Session {
     method: string,
     params: Record<string, unknown>
   ): Promise<unknown> {
+    const browserControlMethods = new Set(['browser_start', 'browser_stop']);
     const client = this.browser.getClient();
-    if (!client && method !== 'page_info') {
-      throw new Error('browser_disconnected');
+    if (!client && !browserControlMethods.has(method)) {
+      throw new Error('browser_not_started');
     }
 
     switch (method) {
+      case 'browser_start': {
+        if (this.browser.isConnected()) {
+          return { status: 'already_running' };
+        }
+        const headless = params.headless !== false;
+        const chromePath =
+          typeof params.chromePath === 'string' ? params.chromePath : undefined;
+        await this.browser.launch({ headless, chromePath });
+        return { status: 'started' };
+      }
+      case 'browser_stop': {
+        await this.browser.stop();
+        return { status: 'stopped' };
+      }
       case 'screenshot': {
         const p = ScreenshotParamsSchema.parse(params);
         return executeScreenshot(client!, p);
@@ -127,8 +142,7 @@ export class Session {
         return executeWait(client!, this.browser, p);
       }
       case 'page_info': {
-        if (!client) throw new Error('browser_disconnected');
-        return executePageInfo(client);
+        return executePageInfo(client!);
       }
       default:
         throw new Error('unknown_method');

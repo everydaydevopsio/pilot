@@ -1,6 +1,15 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { WSClient } from '../ws-client.js';
+import type { Client } from 'chrome-remote-interface';
+import type { BrowserManager } from '../../browser.js';
+import type { BrowserContext } from '../server.js';
+import { executeScreenshot } from '../../commands/screenshot.js';
+import { executeNavigate } from '../../commands/navigate.js';
+import { executeClick } from '../../commands/click.js';
+import { executeType } from '../../commands/type.js';
+import { executeEvaluate } from '../../commands/evaluate.js';
+import { executeWait } from '../../commands/wait.js';
+import { executePageInfo } from '../../commands/page_info.js';
 
 // Raw shapes for MCP SDK (expects ZodRawShape, not ZodObject)
 
@@ -103,54 +112,102 @@ const waitShape = {
     .describe('Overall timeout')
 };
 
-interface ScreenshotResult {
-  dataUrl: string;
-  width: number;
-  height: number;
-}
+const startShape = {
+  headless: z
+    .boolean()
+    .default(true)
+    .describe('Run Chrome headless (default: true)'),
+  chromePath: z
+    .string()
+    .optional()
+    .describe('Path to Chrome executable (auto-detected if omitted)')
+};
 
-interface NavigateResult {
-  url: string;
-  status: number;
-}
-
-interface ClickResult {
-  x: number;
-  y: number;
-}
-
-interface EvaluateResult {
-  value: unknown;
-  type: string;
-}
-
-interface WaitResult {
-  ok: boolean;
-  elapsed: number;
-}
-
-interface PageInfoResult {
-  url: string;
-  title: string;
-  readyState: string;
+function requireClient(context: BrowserContext): {
+  client: Client;
+  manager: BrowserManager;
+} {
+  const manager = context.manager;
+  if (!manager || !manager.isConnected()) {
+    throw new Error('Browser not started. Call browser_start first.');
+  }
+  const client = manager.getClient()!;
+  return { client, manager };
 }
 
 export function registerBrowserTools(
   server: McpServer,
-  wsClient: WSClient
+  context: BrowserContext,
+  makeBrowserManager: () => BrowserManager
 ): void {
+  server.tool(
+    'browser_start',
+    'Launch the Chrome browser. Call this before using any other browser tools.',
+    startShape,
+    async ({ headless, chromePath }) => {
+      if (context.manager?.isConnected()) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: 'Browser is already running.'
+            }
+          ]
+        };
+      }
+
+      if (context.manager) {
+        await context.manager.destroy();
+        context.manager = null;
+      }
+
+      const manager = makeBrowserManager();
+      await manager.launch({ headless, chromePath });
+      context.manager = manager;
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Browser started${headless ? ' (headless)' : ' (visible)'}.`
+          }
+        ]
+      };
+    }
+  );
+
+  server.tool(
+    'browser_stop',
+    'Stop the Chrome browser and free all resources.',
+    {},
+    async () => {
+      if (!context.manager) {
+        return {
+          content: [{ type: 'text' as const, text: 'Browser is not running.' }]
+        };
+      }
+
+      await context.manager.destroy();
+      context.manager = null;
+
+      return {
+        content: [{ type: 'text' as const, text: 'Browser stopped.' }]
+      };
+    }
+  );
+
   server.tool(
     'browser_screenshot',
     'Capture a screenshot of the current browser viewport or full page',
     screenshotShape,
     async ({ format, quality, fullPage }) => {
-      const result = await wsClient.send<ScreenshotResult>('screenshot', {
+      const { client } = requireClient(context);
+      const result = await executeScreenshot(client, {
         format,
         quality,
         fullPage
       });
 
-      // Extract base64 data from data URL
       const base64Match = result.dataUrl.match(/^data:image\/\w+;base64,(.+)$/);
       if (base64Match) {
         return {
@@ -164,7 +221,6 @@ export function registerBrowserTools(
         };
       }
 
-      // Fallback to text response
       return {
         content: [
           {
@@ -181,11 +237,12 @@ export function registerBrowserTools(
     'Navigate to a URL and wait for page load',
     navigateShape,
     async ({ url, waitUntil, timeoutMs }) => {
-      const result = await wsClient.send<NavigateResult>(
-        'navigate',
-        { url, waitUntil, timeoutMs },
-        timeoutMs + 5000
-      );
+      const { client, manager } = requireClient(context);
+      const result = await executeNavigate(client, manager, {
+        url,
+        waitUntil,
+        timeoutMs
+      });
 
       return {
         content: [
@@ -203,7 +260,6 @@ export function registerBrowserTools(
     'Click an element by CSS selector or coordinates. Either selector or x/y coordinates required.',
     clickShape,
     async (params) => {
-      // Validate: either selector or x/y required
       if (
         params.selector === undefined &&
         (params.x === undefined || params.y === undefined)
@@ -219,7 +275,8 @@ export function registerBrowserTools(
         };
       }
 
-      const result = await wsClient.send<ClickResult>('click', params);
+      const { client } = requireClient(context);
+      const result = await executeClick(client, params);
 
       return {
         content: [
@@ -237,7 +294,8 @@ export function registerBrowserTools(
     'Type text into the focused element or a specified selector',
     typeShape,
     async (params) => {
-      await wsClient.send('type', params);
+      const { client } = requireClient(context);
+      await executeType(client, params);
 
       return {
         content: [
@@ -255,11 +313,12 @@ export function registerBrowserTools(
     'Execute JavaScript in the page context and return the result',
     evaluateShape,
     async ({ expression, awaitPromise, timeoutMs }) => {
-      const result = await wsClient.send<EvaluateResult>(
-        'evaluate',
-        { expression, awaitPromise, timeoutMs },
-        timeoutMs + 5000
-      );
+      const { client } = requireClient(context);
+      const result = await executeEvaluate(client, {
+        expression,
+        awaitPromise,
+        timeoutMs
+      });
 
       return {
         content: [
@@ -281,7 +340,6 @@ export function registerBrowserTools(
     'Wait for a selector, network idle, or fixed delay. At least one wait condition required.',
     waitShape,
     async (params) => {
-      // Validate: at least one condition required
       if (
         params.selector === undefined &&
         params.selectorVisible === undefined &&
@@ -299,11 +357,8 @@ export function registerBrowserTools(
         };
       }
 
-      const result = await wsClient.send<WaitResult>(
-        'wait',
-        params,
-        (params.timeoutMs ?? 10000) + 5000
-      );
+      const { client, manager } = requireClient(context);
+      const result = await executeWait(client, manager, params);
 
       return {
         content: [
@@ -321,7 +376,8 @@ export function registerBrowserTools(
     'Get information about the current page (URL, title, ready state)',
     {},
     async () => {
-      const result = await wsClient.send<PageInfoResult>('page_info', {});
+      const { client } = requireClient(context);
+      const result = await executePageInfo(client);
 
       return {
         content: [

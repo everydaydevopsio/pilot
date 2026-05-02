@@ -1,0 +1,157 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bump_and_tag:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.select.outputs.version }}
+      tag: ${{ steps.select.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get previous tag
+        id: prev
+        uses: WyriHaximus/github-action-get-previous-tag@v2
+        with:
+          fallback: v0.0.0
+
+      - name: Calculate next versions
+        id: semver
+        uses: WyriHaximus/github-action-next-semvers@v2
+        with:
+          version: ${{ steps.prev.outputs.tag }}
+
+      - name: Select version
+        id: select
+        run: |
+          case "${{ inputs.release_type }}" in
+            patch) VERSION="${{ steps.semver.outputs.patch }}" ;;
+            minor) VERSION="${{ steps.semver.outputs.minor }}" ;;
+            major) VERSION="${{ steps.semver.outputs.major }}" ;;
+          esac
+          # Remove v prefix for package.json
+          VERSION_NUM="${VERSION#v}"
+          echo "version=${VERSION_NUM}" >> "$GITHUB_OUTPUT"
+          echo "tag=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Selected version: ${VERSION_NUM} (tag: ${VERSION})"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Update package.json version
+        run: |
+          npm version ${{ steps.select.outputs.version }} --no-git-tag-version
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore: bump version to ${{ steps.select.outputs.version }}"
+          git tag ${{ steps.select.outputs.tag }}
+          git push origin HEAD:main
+          git push origin ${{ steps.select.outputs.tag }}
+
+  publish:
+    needs: [bump_and_tag]
+    if: always() && (needs.bump_and_tag.result == 'success' || github.event_name == 'push')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+          else
+            TAG="${{ needs.bump_and_tag.outputs.tag }}"
+            VERSION="${{ needs.bump_and_tag.outputs.version }}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.version.outputs.tag }}
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Run tests
+        run: pnpm run test
+
+      - name: Verify version match
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$PKG_VERSION" != "${{ steps.version.outputs.version }}" ]; then
+            echo "Version mismatch: package.json has $PKG_VERSION but expected ${{ steps.version.outputs.version }}"
+            exit 1
+          fi
+          echo "Version verified: $PKG_VERSION"
+
+      - name: Verify CLI starts
+        run: node dist/index.js --help
+
+      - name: Publish to npm
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true

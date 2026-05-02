@@ -3,3 +3,4 @@ dist/
 coverage/
 .env
 .ballast/
+.claude/scheduled_tasks.lock

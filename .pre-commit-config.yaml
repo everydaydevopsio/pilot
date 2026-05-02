@@ -1,0 +1,31 @@
+repos:
+  - repo: local
+    hooks:
+      - id: prettier
+        name: prettier
+        entry: pnpm exec prettier --write
+        language: system
+        types: [text]
+        files: \.(js|ts|json|md|yaml|yml)$
+
+      - id: eslint
+        name: eslint
+        entry: pnpm exec eslint --fix
+        language: system
+        types: [text]
+        files: \.(js|ts)$
+
+      - id: typecheck
+        name: typecheck
+        entry: pnpm run build
+        language: system
+        files: \.ts$
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: test
+        name: test
+        entry: pnpm run test
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

@@ -22,12 +22,16 @@ Commands:
   (default)     Start the ai-agent-browser server
 
 Server Options:
-  --port        HTTP/WS listen port (default: 8765)
-  --host        Bind address (default: 127.0.0.1)
-  --cdp-port    Chrome DevTools Protocol port (default: 9222)
-  --cdp-host    CDP host (default: 127.0.0.1)
-  --log-level   Log level: trace|debug|info|warn|error (default: info)
-  -h, --help    Show this help message
+  --port            HTTP/WS listen port (default: 8765)
+  --host            Bind address (default: 127.0.0.1)
+  --no-launch       Connect to existing Chrome instead of launching one
+  --cdp-port        Chrome DevTools Protocol port (default: 9222, only with --no-launch)
+  --cdp-host        CDP host (default: 127.0.0.1, only with --no-launch)
+  --headless        Run Chrome headless (default: true)
+  --no-headless     Show the Chrome window
+  --chrome-path     Path to Chrome executable (auto-detected if omitted)
+  --log-level       Log level: trace|debug|info|warn|error (default: info)
+  -h, --help        Show this help message
 
 Init Options:
   --force       Overwrite existing skill file
@@ -48,6 +52,10 @@ async function runServer(): Promise<void> {
       'cdp-port': { type: 'string' },
       'cdp-host': { type: 'string' },
       'log-level': { type: 'string' },
+      'no-launch': { type: 'boolean' },
+      headless: { type: 'boolean' },
+      'no-headless': { type: 'boolean' },
+      'chrome-path': { type: 'string' },
       help: { type: 'boolean', short: 'h' }
     },
     strict: false
@@ -65,16 +73,26 @@ async function runServer(): Promise<void> {
       ? parseInt(values['cdp-port'] as string, 10)
       : undefined,
     cdpHost: values['cdp-host'] as string | undefined,
-    logLevel: values['log-level'] as string | undefined
+    logLevel: values['log-level'] as string | undefined,
+    launchChrome: values['no-launch'] ? false : undefined,
+    headless: values['no-headless']
+      ? false
+      : (values.headless as boolean | undefined),
+    chromePath: values['chrome-path'] as string | undefined
   });
 
   const logger = createLogger(config.logLevel);
   logger.info({ config }, 'Starting ai-agent-browser');
 
   const browser = new BrowserManager(config);
-  await browser.connect();
 
   const server = await startServer(config, browser);
+
+  // When --no-launch is set, auto-connect to the already-running Chrome at cdpPort.
+  // When launchChrome is true (default), Chrome lifecycle is driven by browser_start/browser_stop commands.
+  if (!config.launchChrome) {
+    await browser.connect();
+  }
 
   process.on('SIGTERM', async () => {
     logger.info('SIGTERM received, shutting down');
