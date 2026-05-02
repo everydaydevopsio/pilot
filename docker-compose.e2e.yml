@@ -54,5 +54,5 @@ services:
       dockerfile: Dockerfile.e2e
     command: pnpm run test:e2e:mcp
     environment:
-      # MCP server will find Chrome at this path (installed in Dockerfile.e2e)
-      - AAB_CHROME_PATH=/usr/bin/google-chrome-stable
+      # chromium is installed in Dockerfile.e2e (works on amd64 and arm64)
+      - AAB_CHROME_PATH=/usr/bin/chromium

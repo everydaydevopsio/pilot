@@ -6,6 +6,8 @@
 [![Smoke](https://github.com/markcallen/ai-agent-browser/actions/workflows/smoke.yml/badge.svg)](https://github.com/markcallen/ai-agent-browser/actions/workflows/smoke.yml)
 [![License](https://img.shields.io/github/license/markcallen/ai-agent-browser)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/markcallen/ai-agent-browser)](https://github.com/markcallen/ai-agent-browser/releases)
+[![npm version](https://img.shields.io/npm/v/ai-agent-browser.svg)](https://www.npmjs.com/package/ai-agent-browser)
+[![npm downloads](https://img.shields.io/npm/dm/ai-agent-browser.svg)](https://www.npmjs.com/package/ai-agent-browser)
 
 A lightweight Node.js/TypeScript service that gives AI agents DevTools-grade control over a running Chrome instance. Connects to Chrome via the Chrome DevTools Protocol (CDP) and exposes a **WebSocket API** for screenshots, navigation, clicks, typing, JavaScript evaluation, and live console/network event streaming.
 

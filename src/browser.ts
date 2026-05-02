@@ -257,6 +257,10 @@ export class BrowserManager {
     });
 
     // Console events
+    // CDP uses "warning" for console.warn; normalize to "warn" to match ConsoleLevel.
+    const normLevel = (raw: string): string =>
+      raw === 'warning' ? 'warn' : raw;
+
     client.Runtime.consoleAPICalled((params) => {
       const text = params.args
         .map((a) =>
@@ -264,7 +268,7 @@ export class BrowserManager {
         )
         .join(' ');
       this.emit('console_message', {
-        level: params.type,
+        level: normLevel(params.type),
         text,
         url: params.stackTrace?.callFrames?.[0]?.url ?? '',
         lineNumber: params.stackTrace?.callFrames?.[0]?.lineNumber ?? 0,
@@ -274,7 +278,7 @@ export class BrowserManager {
 
     client.Console.messageAdded((params) => {
       this.emit('console_message', {
-        level: params.message.level,
+        level: normLevel(params.message.level),
         text: params.message.text,
         url: params.message.url ?? '',
         lineNumber: params.message.line ?? 0,
