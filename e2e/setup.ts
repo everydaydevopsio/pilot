@@ -92,9 +92,9 @@ export default async function globalSetup(): Promise<void> {
     : null;
 
   if (dockerCdpHost && dockerCdpPort) {
-    // ── Docker mode ────────────────────────────────────────────────────────
-    // Chrome is already running as a separate container (healthcheck passed).
-    // Start aab pointing at it; no need to spawn or wait for Chrome.
+    // ── Docker mode (external Chrome) ─────────────────────────────────────
+    // Chrome is running as a separate container (healthcheck passed).
+    // Start aab pointing at it; no need to spawn or wait for Chrome here.
     const aab = spawn(
       'node',
       [

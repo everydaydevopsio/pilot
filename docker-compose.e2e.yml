@@ -1,42 +1,16 @@
 # E2E test stacks.
 #
 # HTTP mode  (--profile http): tests the WebSocket/HTTP API.
-#   Chrome runs as a separate service; the HTTP server connects to it externally.
+#   Chrome and aab both run inside the single Dockerfile.e2e container.
+#   globalSetup spawns Chrome via CHROME_PATH then starts aab with --no-launch.
 #   Run: docker compose -f docker-compose.e2e.yml --profile http up --build
 #
 # MCP mode   (--profile mcp): tests MCP tools end-to-end.
-#   No separate Chrome service — the MCP server launches Chrome itself via
-#   browser_start. Chrome must be installed in the test image (Dockerfile.e2e).
+#   The MCP server launches Chrome itself via browser_start.
 #   Run: docker compose -f docker-compose.e2e.yml --profile mcp up --build
 
 services:
   # ── HTTP mode ────────────────────────────────────────────────────────────────
-
-  chrome:
-    profiles: [http]
-    image: zenika/alpine-chrome:latest
-    command:
-      - --no-sandbox
-      - --headless=new
-      - --disable-gpu
-      - --remote-debugging-address=0.0.0.0
-      - --remote-debugging-port=9222
-      - about:blank
-    ports:
-      - '9333:9222'
-    healthcheck:
-      test:
-        [
-          'CMD',
-          'wget',
-          '-q',
-          '-O',
-          '/dev/null',
-          'http://localhost:9222/json/version'
-        ]
-      interval: 2s
-      timeout: 5s
-      retries: 10
 
   e2e:
     profiles: [http]
@@ -45,12 +19,10 @@ services:
       dockerfile: Dockerfile.e2e
     command: pnpm run test:e2e
     environment:
-      - E2E_CDP_PORT=9222
-      - E2E_CDP_HOST=chrome
-      - E2E_AAB_PORT=8866
-    depends_on:
-      chrome:
-        condition: service_healthy
+      # chromium is installed in Dockerfile.e2e (works on amd64 and arm64).
+      # CHROME_PATH is checked first in findChromeBinary(), bypassing the
+      # Linux no-display guard so Chrome runs headless inside the container.
+      - CHROME_PATH=/usr/bin/chromium
 
   # ── MCP mode ─────────────────────────────────────────────────────────────────
 
