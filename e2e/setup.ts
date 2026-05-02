@@ -34,6 +34,10 @@ function waitForPort(
 }
 
 function findChromeBinary(): string {
+  // browser-actions/setup-chrome sets CHROME_PATH to the installed binary
+  if (process.env.CHROME_PATH) {
+    return process.env.CHROME_PATH;
+  }
   const candidates = [
     'google-chrome',
     'google-chrome-stable',
