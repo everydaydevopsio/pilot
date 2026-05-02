@@ -1,7 +1,6 @@
 # ai-agent-browser
 
 [![CI](https://github.com/markcallen/ai-agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/markcallen/ai-agent-browser/actions/workflows/ci.yml)
-[![Lint](https://github.com/markcallen/ai-agent-browser/actions/workflows/lint.yml/badge.svg)](https://github.com/markcallen/ai-agent-browser/actions/workflows/lint.yml)
 [![E2E](https://github.com/markcallen/ai-agent-browser/actions/workflows/e2e.yml/badge.svg)](https://github.com/markcallen/ai-agent-browser/actions/workflows/e2e.yml)
 [![Smoke](https://github.com/markcallen/ai-agent-browser/actions/workflows/smoke.yml/badge.svg)](https://github.com/markcallen/ai-agent-browser/actions/workflows/smoke.yml)
 [![License](https://img.shields.io/github/license/markcallen/ai-agent-browser)](LICENSE)

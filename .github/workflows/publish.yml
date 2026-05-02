@@ -61,8 +61,13 @@ jobs:
           echo "tag=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Selected version: ${VERSION_NUM} (tag: ${VERSION})"
 
+      - name: Enable corepack
+        run: corepack enable
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -107,8 +112,13 @@ jobs:
         with:
           ref: ${{ steps.version.outputs.tag }}
 
+      - name: Enable corepack
+        run: corepack enable
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
