@@ -43,7 +43,6 @@ services:
     depends_on:
       chrome:
         condition: service_healthy
-    network_mode: host
 
   # ── MCP mode ─────────────────────────────────────────────────────────────────
 

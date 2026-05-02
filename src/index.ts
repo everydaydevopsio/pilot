@@ -88,6 +88,12 @@ async function runServer(): Promise<void> {
 
   const server = await startServer(config, browser);
 
+  // When --no-launch is set, auto-connect to the already-running Chrome at cdpPort.
+  // When launchChrome is true (default), Chrome lifecycle is driven by browser_start/browser_stop commands.
+  if (!config.launchChrome) {
+    await browser.connect();
+  }
+
   process.on('SIGTERM', async () => {
     logger.info('SIGTERM received, shutting down');
     await server.close();

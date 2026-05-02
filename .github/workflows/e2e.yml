@@ -18,33 +18,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Enable corepack
-        run: corepack enable
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm run build
-
-      - name: Install Chrome
-        uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: stable
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Run E2E tests
-        run: pnpm run test:e2e
-        env:
-          NODE_ENV: test
+        run: docker compose -f docker-compose.e2e.yml --profile http up --build --abort-on-container-exit --exit-code-from e2e
+
+      - name: Capture docker logs on failure
+        if: failure()
+        run: |
+          mkdir -p /tmp/e2e-logs
+          docker compose -f docker-compose.e2e.yml logs > /tmp/e2e-logs/compose.log 2>&1 || true
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: /tmp/e2e-logs/
+          retention-days: 7
 
   e2e-mcp:
     runs-on: ubuntu-latest
