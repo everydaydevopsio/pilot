@@ -25,7 +25,15 @@ services:
     ports:
       - '9333:9222'
     healthcheck:
-      test: ['CMD-SHELL', 'sh -c "echo > /dev/tcp/localhost/9222" 2>/dev/null']
+      test:
+        [
+          'CMD',
+          'wget',
+          '-q',
+          '-O',
+          '/dev/null',
+          'http://localhost:9222/json/version'
+        ]
       interval: 2s
       timeout: 5s
       retries: 10
