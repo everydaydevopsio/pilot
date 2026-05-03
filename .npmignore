@@ -1,0 +1,48 @@
+# AI/agent tool configs
+.claude/
+.codex/
+.ballast/
+.rulesrc.json
+
+# CI/CD and GitHub
+.github/
+
+# Git hooks
+.pre-commit-config.yaml
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+
+# Tests
+test/
+e2e/
+coverage/
+jest.config.js
+jest.e2e.config.js
+jest.e2e-mcp.config.js
+tsconfig.test.json
+
+# Dev scripts
+scripts/
+
+# Planning and task tracking
+plans/
+tasks/
+PRD.md
+
+# Linting and formatting
+eslint.config.mjs
+.prettierrc
+.prettierignore
+
+# Node version management
+.nvmrc
+
+# Environment
+.env
+.env.example
+
+# Infrastructure
+systemd/
+Makefile
