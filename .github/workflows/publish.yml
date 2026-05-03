@@ -89,8 +89,8 @@ jobs:
     if: always() && (needs.bump_and_tag.result == 'success' || github.event_name == 'push')
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write
+      contents: write
+      packages: write
     steps:
       - name: Determine version
         id: version
@@ -121,7 +121,7 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: 'https://npm.pkg.github.com'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -144,10 +144,10 @@ jobs:
       - name: Verify CLI starts
         run: node dist/index.js --help
 
-      - name: Publish to npm
-        run: npm publish --access public --provenance
+      - name: Publish to GitHub Packages
+        run: npm publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

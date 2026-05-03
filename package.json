@@ -1,5 +1,8 @@
 {
-  "name": "ai-agent-browser",
+  "name": "@markcallen/ai-agent-browser",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "version": "0.1.1",
   "description": "DevTools-grade browser control service for AI agents via WebSocket + CDP",
   "type": "module",
