@@ -4,30 +4,27 @@
     "registry": "https://npm.pkg.github.com"
   },
   "version": "0.1.2",
-  "description": "DevTools-grade browser control service for AI agents via WebSocket + CDP",
+  "description": "DevTools-grade browser control for AI agents via MCP + CDP",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/mcp/index.js",
   "bin": {
-    "aab": "dist/index.js",
+    "aab": "dist/mcp/index.js",
     "aab-mcp": "dist/mcp/index.js",
-    "ai-agent-browser": "dist/index.js",
+    "ai-agent-browser": "dist/mcp/index.js",
     "ai-agent-browser-mcp": "dist/mcp/index.js"
   },
   "scripts": {
     "build": "rimraf ./dist && tsc",
-    "start": "node dist/index.js",
-    "dev": "tsx src/index.ts",
+    "start": "node dist/mcp/index.js",
+    "dev": "tsx src/mcp/index.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prettier": "prettier . --check",
     "prettier:fix": "prettier . --write",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "test:e2e": "jest --config jest.e2e.config.js",
-    "test:e2e:docker": "docker compose -f docker-compose.e2e.yml --profile http up --build --abort-on-container-exit --exit-code-from e2e",
     "test:e2e:mcp": "jest --config jest.e2e-mcp.config.js",
-    "test:e2e:mcp:docker": "docker compose -f docker-compose.e2e.yml --profile mcp up --build --abort-on-container-exit --exit-code-from e2e-mcp",
-    "test:smoke": "./scripts/smoke-test.sh"
+    "test:e2e:mcp:docker": "docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e"
   },
   "keywords": [
     "browser",
@@ -43,12 +40,9 @@
   },
   "packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8",
   "dependencies": {
-    "@fastify/websocket": "^11.2.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "chrome-remote-interface": "^0.34.0",
-    "fastify": "^5.8.5",
     "pino": "^10.3.1",
-    "ws": "^8.19.0",
     "zod": "^4.4.2"
   },
   "devDependencies": {
@@ -56,7 +50,6 @@
     "@types/chrome-remote-interface": "^0.33.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.4.0",
-    "@types/ws": "^8.18.1",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",

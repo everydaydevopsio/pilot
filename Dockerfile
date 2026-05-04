@@ -12,4 +12,4 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
 RUN pnpm run build
 
-CMD [ "pnpm", "start" ]
+CMD [ "node", "dist/mcp/index.js" ]

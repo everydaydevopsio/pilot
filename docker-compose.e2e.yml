@@ -1,33 +1,9 @@
-# E2E test stacks.
-#
-# HTTP mode  (--profile http): tests the WebSocket/HTTP API.
-#   Chrome and aab both run inside the single Dockerfile.e2e container.
-#   globalSetup spawns Chrome via CHROME_PATH then starts aab with --no-launch.
-#   Run: docker compose -f docker-compose.e2e.yml --profile http up --build
-#
-# MCP mode   (--profile mcp): tests MCP tools end-to-end.
-#   The MCP server launches Chrome itself via browser_start.
-#   Run: docker compose -f docker-compose.e2e.yml --profile mcp up --build
+# E2E test stack — MCP mode only.
+# The MCP server launches Chrome itself via browser_start.
+# Run: docker compose -f docker-compose.e2e.yml up --build
 
 services:
-  # ── HTTP mode ────────────────────────────────────────────────────────────────
-
   e2e:
-    profiles: [http]
-    build:
-      context: .
-      dockerfile: Dockerfile.e2e
-    command: pnpm run test:e2e
-    environment:
-      # chromium is installed in Dockerfile.e2e (works on amd64 and arm64).
-      # CHROME_PATH is checked first in findChromeBinary(), bypassing the
-      # Linux no-display guard so Chrome runs headless inside the container.
-      - CHROME_PATH=/usr/bin/chromium
-
-  # ── MCP mode ─────────────────────────────────────────────────────────────────
-
-  e2e-mcp:
-    profiles: [mcp]
     build:
       context: .
       dockerfile: Dockerfile.e2e

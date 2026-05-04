@@ -392,7 +392,8 @@ export class BrowserManager {
     }
   }
 
-  async stop(): Promise<void> {
+  async destroy(): Promise<void> {
+    this.destroyed = true;
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
       this.retryTimer = null;
@@ -414,10 +415,5 @@ export class BrowserManager {
       this.launchedCdpPort = null;
       this.cleanupUserDataDir();
     }
-  }
-
-  async destroy(): Promise<void> {
-    this.destroyed = true;
-    await this.stop();
   }
 }
