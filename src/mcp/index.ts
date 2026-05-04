@@ -3,6 +3,9 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createMcpServer } from './server.js';
 
+const args = process.argv.slice(2);
+const subcommand = args[0] && !args[0].startsWith('-') ? args[0] : null;
+
 const config = {
   bufferSize: parseInt(process.env.AAB_MCP_BUFFER_SIZE ?? '1000', 10),
   cdpPort: process.env.AAB_CDP_PORT
@@ -12,6 +15,13 @@ const config = {
 };
 
 async function main(): Promise<void> {
+  if (subcommand === 'init') {
+    const { runInit } = await import('../cli/init.js');
+    const force = args.includes('--force');
+    await runInit({ force });
+    return;
+  }
+
   const { server, cleanup } = await createMcpServer(config);
   const transport = new StdioServerTransport();
 

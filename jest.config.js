@@ -17,7 +17,7 @@ export default {
       }
     ]
   },
-  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts', '!src/index.ts'],
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts', '!src/mcp/index.ts'],
   coverageThreshold: {
     global: {
       lines: 50,

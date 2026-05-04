@@ -3,9 +3,5 @@ services:
     build: .
     tty: true
     environment:
-      - AAB_HOST=0.0.0.0
-      - AAB_PORT=8765
       - NODE_ENV=production
       - AAB_CHROME_PATH=/usr/bin/chromium
-    ports:
-      - '8765:8765'
