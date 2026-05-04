@@ -5,6 +5,14 @@ updates:
     schedule:
       interval: 'weekly'
     open-pull-requests-limit: 10
+    ignore:
+      # Do not bump TypeScript across major versions
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
+      # Pin @types/node to the major version in .nvmrc (currently 24).
+      # When .nvmrc is updated to a new major, update the versions constraint below.
+      - dependency-name: '@types/node'
+        versions: ['>= 25']
     groups:
       testing:
         patterns:
