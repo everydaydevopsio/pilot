@@ -142,7 +142,7 @@ jobs:
           echo "Version verified: $PKG_VERSION"
 
       - name: Verify CLI starts
-        run: node dist/index.js --help
+        run: node dist/mcp/index.js --help
 
       - name: Publish to GitHub Packages
         run: npm publish
