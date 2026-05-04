@@ -25,7 +25,7 @@ Follow these steps in order.
 Add the ai-agent-browser MCP server to the current Claude Code session:
 
 \`\`\`bash
-claude mcp add ai-agent-browser --scope session -- npx ai-agent-browser
+claude mcp add ai-agent-browser --scope session -- npx @markcallen/ai-agent-browser
 \`\`\`
 
 This gives you access to browser control tools like:

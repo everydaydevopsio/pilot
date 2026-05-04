@@ -35,11 +35,13 @@ pnpm run build
 pnpm start
 ```
 
-### With Docker Compose
+### With Docker
+
+To use the MCP server from a Docker container, pass `-i` so stdin stays open for stdio communication:
 
 ```bash
-# Production stack
-docker compose up --build
+docker build -t ai-agent-browser .
+claude mcp add ai-agent-browser -- docker run -i --rm ai-agent-browser
 ```
 
 ## Claude Code Integration
@@ -101,14 +103,14 @@ Or add to `.mcp.json` in your project:
 
 All configuration via environment variables.
 
-| Env var               | Default     | Description                   |
-| --------------------- | ----------- | ----------------------------- |
-| `AAB_CDP_PORT`        | `9222`      | Chrome DevTools Protocol port |
-| `AAB_CDP_HOST`        | `127.0.0.1` | CDP host                      |
-| `AAB_LOG_LEVEL`       | `info`      | Pino log level                |
-| `AAB_CHROME_PATH`     | (auto)      | Path to Chrome executable     |
-| `AAB_HEADLESS`        | `true`      | Run Chrome headless           |
-| `AAB_MCP_BUFFER_SIZE` | `1000`      | Console message buffer size   |
+| Env var               | Default     | Description                                                                                   |
+| --------------------- | ----------- | --------------------------------------------------------------------------------------------- |
+| `AAB_CDP_PORT`        | `9222`      | CDP port when connecting to an existing Chrome (ignored when `browser_start` launches Chrome) |
+| `AAB_CDP_HOST`        | `127.0.0.1` | CDP host when connecting to an existing Chrome (ignored when `browser_start` launches Chrome) |
+| `AAB_LOG_LEVEL`       | `info`      | Pino log level                                                                                |
+| `AAB_CHROME_PATH`     | (auto)      | Path to Chrome executable                                                                     |
+| `AAB_HEADLESS`        | `true`      | Run Chrome headless                                                                           |
+| `AAB_MCP_BUFFER_SIZE` | `1000`      | Console message buffer size                                                                   |
 
 ## Testing
 

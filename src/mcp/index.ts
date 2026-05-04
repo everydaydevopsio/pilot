@@ -2,9 +2,14 @@
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createMcpServer } from './server.js';
+import { loadConfig } from '../util/config.js';
+import { createLogger } from '../util/logger.js';
 
 const args = process.argv.slice(2);
 const subcommand = args[0] && !args[0].startsWith('-') ? args[0] : null;
+
+const baseConfig = loadConfig();
+createLogger(baseConfig.logLevel);
 
 const config = {
   bufferSize: parseInt(process.env.AAB_MCP_BUFFER_SIZE ?? '1000', 10),

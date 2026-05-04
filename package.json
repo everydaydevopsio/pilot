@@ -40,12 +40,9 @@
   },
   "packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8",
   "dependencies": {
-    "@fastify/websocket": "^11.2.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "chrome-remote-interface": "^0.34.0",
-    "fastify": "^5.8.2",
     "pino": "^10.3.1",
-    "ws": "^8.19.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -53,7 +50,6 @@
     "@types/chrome-remote-interface": "^0.33.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.4.0",
-    "@types/ws": "^8.18.1",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
