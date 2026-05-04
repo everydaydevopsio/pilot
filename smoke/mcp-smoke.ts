@@ -11,21 +11,9 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { resolve } from 'node:path';
+import { EXPECTED_TOOLS } from '../src/mcp/tools/names.js';
 
-const EXPECTED_TOOLS = [
-  'browser_start',
-  'browser_stop',
-  'browser_screenshot',
-  'browser_navigate',
-  'browser_click',
-  'browser_type',
-  'browser_evaluate',
-  'browser_wait',
-  'browser_page_info',
-  'browser_get_console_logs',
-  'browser_get_errors',
-  'browser_clear_errors'
-];
+const CONNECT_TIMEOUT_MS = 15_000;
 
 interface CheckResult {
   name: string;
@@ -64,6 +52,22 @@ function printSummary(): void {
   }
 }
 
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Timed out after ${ms}ms: ${label}`)),
+        ms
+      )
+    )
+  ]);
+}
+
 async function main(): Promise<void> {
   console.log('=== MCP Smoke Test ===\n');
 
@@ -80,7 +84,11 @@ async function main(): Promise<void> {
 
   // ── Use case 1: server starts and accepts a connection ─────────────────────
   try {
-    await client.connect(transport);
+    await withTimeout(
+      client.connect(transport),
+      CONNECT_TIMEOUT_MS,
+      'client.connect'
+    );
     pass('MCP server starts and accepts connections');
   } catch (err) {
     fail('MCP server starts and accepts connections', String(err));
@@ -91,7 +99,11 @@ async function main(): Promise<void> {
   // ── Use case 2: tools/list returns a non-empty list ────────────────────────
   let toolNames: string[] = [];
   try {
-    const response = await client.listTools();
+    const response = await withTimeout(
+      client.listTools(),
+      CONNECT_TIMEOUT_MS,
+      'client.listTools'
+    );
     toolNames = response.tools.map((t) => t.name);
     if (toolNames.length > 0) {
       pass('Tool list is non-empty', `${toolNames.length} tools returned`);
@@ -128,7 +140,7 @@ async function main(): Promise<void> {
   }
 
   // ── Use case 5: no unrecognised extra tools ────────────────────────────────
-  const extra = toolNames.filter((t) => !EXPECTED_TOOLS.includes(t));
+  const extra = toolNames.filter((t) => !EXPECTED_TOOLS.includes(t as never));
   if (extra.length === 0) {
     pass('No unrecognised tools registered');
   } else {
