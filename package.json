@@ -23,8 +23,10 @@
     "prettier:fix": "prettier . --write",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "test:e2e:mcp": "jest --config jest.e2e-mcp.config.js",
-    "test:e2e:mcp:docker": "docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e"
+    "test:e2e:mcp": "jest --config jest.e2e-mcp.config.js --verbose",
+    "test:e2e:mcp:docker": "docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e",
+    "test:smoke": "tsx smoke/mcp-smoke.ts",
+    "test:smoke:docker": "docker compose -f docker-compose.smoke.yml up --build --abort-on-container-exit --exit-code-from smoke"
   },
   "keywords": [
     "browser",

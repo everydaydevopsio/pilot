@@ -20,19 +20,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Run smoke test (MCP E2E)
-        run: docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+      - name: Run smoke test (MCP server start + tool list)
+        run: docker compose -f docker-compose.smoke.yml up --build --abort-on-container-exit --exit-code-from smoke
 
       - name: Capture docker logs on failure
         if: failure()
         run: |
-          mkdir -p /tmp/docker-logs
-          docker compose -f docker-compose.e2e.yml logs > /tmp/docker-logs/compose.log 2>&1 || true
+          mkdir -p /tmp/smoke-logs
+          docker compose -f docker-compose.smoke.yml logs > /tmp/smoke-logs/compose.log 2>&1 || true
 
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: docker-logs
-          path: /tmp/docker-logs/
+          name: smoke-logs
+          path: /tmp/smoke-logs/
           retention-days: 7

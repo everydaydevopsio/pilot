@@ -1,0 +1,10 @@
+# Smoke test stack — MCP server reachability and tool-list verification.
+# No browser required; Chrome is NOT installed in this image.
+# Run: docker compose -f docker-compose.smoke.yml up --build
+
+services:
+  smoke:
+    build:
+      context: .
+      dockerfile: Dockerfile.smoke
+    command: pnpm run test:smoke

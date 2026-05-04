@@ -1,0 +1,15 @@
+FROM node:24-bookworm
+
+# No browser required — smoke test only checks the MCP server and tool list.
+
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@10 --activate
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+COPY . .
+RUN pnpm run build
+
+CMD ["pnpm", "run", "test:smoke"]
