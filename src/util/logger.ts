@@ -3,13 +3,10 @@ import pino from 'pino';
 let _logger: pino.Logger | null = null;
 
 export function createLogger(level = 'info'): pino.Logger {
-  _logger = pino({
-    level,
-    transport:
-      process.env.NODE_ENV !== 'production'
-        ? { target: 'pino-pretty', options: { colorize: true } }
-        : undefined
-  });
+  // Always write to stderr: this is an MCP server that communicates over stdio,
+  // so stdout must carry only MCP protocol messages. pino-pretty is a
+  // devDependency and is not available in production/global installs.
+  _logger = pino({ level }, process.stderr);
   return _logger;
 }
 
