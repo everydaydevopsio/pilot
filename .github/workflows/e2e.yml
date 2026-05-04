@@ -1,8 +1,6 @@
 name: E2E Tests
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -21,7 +19,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Run MCP E2E tests
+      - name: Run MCP E2E tests (per-tool verification with browser)
         run: docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
 
       - name: Capture docker logs on failure

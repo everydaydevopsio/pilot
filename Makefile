@@ -2,8 +2,9 @@ COMPOSE := docker compose
 LOCAL_COMPOSE := $(COMPOSE) -f docker-compose.yml -f docker-compose.local.yml
 E2E_HTTP_COMPOSE := $(COMPOSE) -f docker-compose.e2e.yml --profile http
 E2E_MCP_COMPOSE  := $(COMPOSE) -f docker-compose.e2e.yml --profile mcp
+SMOKE_COMPOSE    := $(COMPOSE) -f docker-compose.smoke.yml
 
-.PHONY: up down logs up-local down-local logs-local build clean e2e e2e-mcp
+.PHONY: up down logs up-local down-local logs-local build clean smoke e2e e2e-mcp
 
 up:
 	$(COMPOSE) up --build
@@ -28,6 +29,10 @@ build:
 
 clean:
 	$(COMPOSE) down -v --rmi local
+
+# Run smoke test in Docker (MCP server start + tool list, no browser required)
+smoke:
+	$(SMOKE_COMPOSE) up --build --abort-on-container-exit --exit-code-from smoke
 
 # Run HTTP e2e tests in Docker (WebSocket/HTTP API, Chrome as a separate service)
 e2e:

@@ -1,4 +1,5 @@
 import { McpTestClient } from './client.js';
+import { EXPECTED_TOOLS } from '../../src/mcp/tools/names.js';
 
 // ── Tools available without a running browser ────────────────────────────────
 
@@ -16,21 +17,7 @@ describe('MCP E2E: tool registration', () => {
 
   it('lists all expected tools', async () => {
     const tools = await mcp.listTools();
-    const expected = [
-      'browser_start',
-      'browser_stop',
-      'browser_screenshot',
-      'browser_navigate',
-      'browser_click',
-      'browser_type',
-      'browser_evaluate',
-      'browser_wait',
-      'browser_page_info',
-      'browser_get_console_logs',
-      'browser_get_errors',
-      'browser_clear_errors'
-    ];
-    for (const name of expected) {
+    for (const name of EXPECTED_TOOLS) {
       expect(tools).toContain(name);
     }
   });
