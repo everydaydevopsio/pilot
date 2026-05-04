@@ -5,6 +5,7 @@ on:
     branches: [main]
   schedule:
     - cron: '0 2 * * 1' # Monday 02:00 UTC = Sunday 22:00 EST / 21:00 CST
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
