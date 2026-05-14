@@ -129,6 +129,8 @@ All configuration via environment variables.
 | `AAB_HEADLESS`        | `true`      | Run Chrome headless                                                                           |
 | `AAB_MCP_BUFFER_SIZE` | `1000`      | Console message buffer size                                                                   |
 
+> **Tip — seeing the browser window:** By default Chrome runs headless (no visible window). To watch the browser while the agent works, ask the AI agent: _"set headless to false"_ (or _"run Chrome with a visible window"_). The agent will set `AAB_HEADLESS=false` before calling `browser_start`, and a Chrome window will appear on your desktop.
+
 ## Testing
 
 ```bash
