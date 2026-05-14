@@ -10,6 +10,13 @@ import type { Config } from './util/config.js';
 
 export type BrowserEventCallback = (event: string, data: unknown) => void;
 
+export interface TabInfo {
+  targetId: string;
+  url: string;
+  title: string;
+  active: boolean;
+}
+
 export interface BrowserState {
   client: Client | null;
   targetId: string | null;
@@ -367,6 +374,86 @@ export class BrowserManager {
         resolve();
       });
     });
+  }
+
+  private getCdpConnectionInfo(): { host: string; port: number } {
+    return {
+      host: this.launchedCdpPort ? '127.0.0.1' : this.config.cdpHost,
+      port: this.launchedCdpPort ?? this.config.cdpPort
+    };
+  }
+
+  async listTabs(): Promise<TabInfo[]> {
+    const { host, port } = this.getCdpConnectionInfo();
+    const targets = await CDP.List({ host, port });
+    return targets
+      .filter((t) => t.type === 'page')
+      .map((t) => ({
+        targetId: t.id,
+        url: t.url,
+        title: t.title,
+        active: t.id === this.targetId
+      }));
+  }
+
+  async createTab(url?: string): Promise<TabInfo> {
+    const { host, port } = this.getCdpConnectionInfo();
+    // chrome-remote-interface appends the url to the HTTP request path
+    // without encoding, so we must encode it ourselves to avoid
+    // ERR_UNESCAPED_CHARACTERS on URLs with special characters.
+    const encodedUrl = url ? encodeURI(url) : undefined;
+    const target = await CDP.New({ host, port, url: encodedUrl });
+    return {
+      targetId: target.id,
+      url: target.url,
+      title: target.title,
+      active: false
+    };
+  }
+
+  async closeTab(targetId: string): Promise<void> {
+    if (targetId === this.targetId) {
+      throw new Error(
+        'Cannot close the active tab. Switch to another tab first.'
+      );
+    }
+    const { host, port } = this.getCdpConnectionInfo();
+    await CDP.Close({ host, port, id: targetId });
+  }
+
+  async switchTab(targetId: string): Promise<void> {
+    if (targetId === this.targetId) return;
+
+    const { host, port } = this.getCdpConnectionInfo();
+
+    // Verify the target exists
+    const targets = await CDP.List({ host, port });
+    const target = targets.find((t) => t.id === targetId && t.type === 'page');
+    if (!target) {
+      throw new Error(`No page tab found with targetId: ${targetId}`);
+    }
+
+    // Close old client connection (but not the tab)
+    if (this.client) {
+      await this.client.close();
+      this.client = null;
+    }
+
+    // Connect to the new target
+    const client = await CDP({ host, port, target: targetId });
+    this.client = client;
+    this.targetId = targetId;
+    this.currentUrl = target.url;
+    this.retryMs = this.config.cdpRetryMs;
+
+    await this.enableDomains(client);
+    this.attachEventListeners(client);
+
+    // Activate the tab in the browser UI
+    await client.Target.activateTarget({ targetId });
+
+    const logger = getLogger();
+    logger.info({ targetId, url: target.url }, 'Switched to tab');
   }
 
   private scheduleReconnect(): void {

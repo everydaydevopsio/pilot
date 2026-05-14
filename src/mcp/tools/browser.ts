@@ -10,6 +10,12 @@ import { executeType } from '../../commands/type.js';
 import { executeEvaluate } from '../../commands/evaluate.js';
 import { executeWait } from '../../commands/wait.js';
 import { executePageInfo } from '../../commands/page_info.js';
+import {
+  executeListTabs,
+  executeNewTab,
+  executeCloseTab,
+  executeSwitchTab
+} from '../../commands/tabs.js';
 
 // Raw shapes for MCP SDK (expects ZodRawShape, not ZodObject)
 
@@ -121,6 +127,21 @@ const startShape = {
     .string()
     .optional()
     .describe('Path to Chrome executable (auto-detected if omitted)')
+};
+
+const newTabShape = {
+  url: z
+    .string()
+    .optional()
+    .describe('URL to open in the new tab (opens blank tab if omitted)')
+};
+
+const closeTabShape = {
+  targetId: z.string().describe('Target ID of the tab to close')
+};
+
+const switchTabShape = {
+  targetId: z.string().describe('Target ID of the tab to switch to')
 };
 
 function requireClient(context: BrowserContext): {
@@ -384,6 +405,82 @@ export function registerBrowserTools(
           {
             type: 'text' as const,
             text: JSON.stringify(result, null, 2)
+          }
+        ]
+      };
+    }
+  );
+
+  server.tool(
+    'browser_list_tabs',
+    'List all open browser tabs with their target IDs, URLs, titles, and active status',
+    {},
+    async () => {
+      const { manager } = requireClient(context);
+      const tabs = await executeListTabs(manager);
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify(tabs, null, 2)
+          }
+        ]
+      };
+    }
+  );
+
+  server.tool(
+    'browser_new_tab',
+    'Open a new browser tab, optionally navigating to a URL',
+    newTabShape,
+    async ({ url }) => {
+      const { manager } = requireClient(context);
+      const result = await executeNewTab(manager, url);
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `New tab opened (targetId: ${result.targetId}, url: ${result.url})`
+          }
+        ]
+      };
+    }
+  );
+
+  server.tool(
+    'browser_close_tab',
+    'Close a browser tab by its target ID. Cannot close the currently active tab.',
+    closeTabShape,
+    async ({ targetId }) => {
+      const { manager } = requireClient(context);
+      await executeCloseTab(manager, targetId);
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Tab ${targetId} closed.`
+          }
+        ]
+      };
+    }
+  );
+
+  server.tool(
+    'browser_switch_tab',
+    'Switch the active browser tab to the one with the given target ID. All subsequent commands will target this tab.',
+    switchTabShape,
+    async ({ targetId }) => {
+      const { manager } = requireClient(context);
+      await executeSwitchTab(manager, targetId);
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Switched to tab ${targetId}.`
           }
         ]
       };

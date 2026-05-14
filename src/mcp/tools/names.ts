@@ -12,6 +12,10 @@ export const EXPECTED_TOOLS = [
   'browser_evaluate',
   'browser_wait',
   'browser_page_info',
+  'browser_list_tabs',
+  'browser_new_tab',
+  'browser_close_tab',
+  'browser_switch_tab',
   'browser_get_console_logs',
   'browser_get_errors',
   'browser_clear_errors'
