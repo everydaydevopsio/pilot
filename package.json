@@ -23,7 +23,7 @@
     "prettier:fix": "prettier . --write",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "test:e2e:mcp": "jest --config jest.e2e-mcp.config.js --verbose",
+    "test:e2e:mcp": "AAB_HEADLESS=false jest --config jest.e2e-mcp.config.js --verbose",
     "test:e2e:mcp:docker": "docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e",
     "pretest:smoke": "pnpm run build",
     "test:smoke": "tsx smoke/mcp-smoke.ts",

@@ -1,6 +1,8 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { resolve } from 'node:path';
+import { rmSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 export type TextContent = { type: 'text'; text: string };
 export type ImageContent = { type: 'image'; data: string; mimeType: string };
@@ -11,17 +13,22 @@ export interface ToolResult {
   isError?: boolean;
 }
 
+let clientCounter = 0;
+
 export class McpTestClient {
   private client: Client;
   private transport: StdioClientTransport;
+  private profileName: string;
 
   constructor() {
+    this.profileName = `e2e-${process.pid}-${++clientCounter}`;
     this.transport = new StdioClientTransport({
       command: 'node',
       args: [resolve('dist/mcp/index.js')],
       env: {
         ...process.env,
         AAB_MCP_BUFFER_SIZE: '500',
+        AAB_PROFILE_NAME: this.profileName,
         NODE_ENV: 'test'
       }
     });
@@ -84,6 +91,18 @@ export class McpTestClient {
       await this.client.close();
     } catch {
       // ignore errors during cleanup
+    }
+    this.cleanupProfile();
+  }
+
+  private cleanupProfile(): void {
+    try {
+      const xdgData =
+        process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share');
+      const profileDir = join(xdgData, 'aab', this.profileName);
+      rmSync(profileDir, { recursive: true, force: true });
+    } catch {
+      // best-effort cleanup
     }
   }
 }
