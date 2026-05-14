@@ -1,7 +1,7 @@
 import CDP from 'chrome-remote-interface';
 import type { Client } from 'chrome-remote-interface';
 import { spawn, type ChildProcess } from 'child_process';
-import { existsSync, mkdirSync, readFileSync } from 'fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync } from 'fs';
 import * as net from 'net';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -74,10 +74,21 @@ export function resolveUserDataDir(profileName: string): string {
   return join(xdgData, 'aab', profileName);
 }
 
+function fileOrSymlinkExists(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function isProfileLocked(userDataDir: string): boolean {
-  // Chrome writes a SingletonLock file while running
+  // Chrome writes SingletonLock as a symlink on Linux (target: hostname-pid).
+  // The symlink is dangling, so existsSync (which follows symlinks) returns
+  // false. Use lstatSync to detect the symlink itself.
   return (
-    existsSync(join(userDataDir, 'SingletonLock')) ||
+    fileOrSymlinkExists(join(userDataDir, 'SingletonLock')) ||
     existsSync(join(userDataDir, 'lockfile'))
   );
 }

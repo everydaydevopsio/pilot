@@ -1,4 +1,22 @@
+import { rmSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { McpTestClient } from './client.js';
+
+const TEST_PROFILE = `e2e-profile-${process.pid}`;
+
+function cleanupTestProfile(): void {
+  try {
+    const xdgData =
+      process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share');
+    rmSync(join(xdgData, 'aab', TEST_PROFILE), {
+      recursive: true,
+      force: true
+    });
+  } catch {
+    // best-effort
+  }
+}
 
 describe('MCP E2E: browser_start with profileName', () => {
   let mcp: McpTestClient;
@@ -11,12 +29,13 @@ describe('MCP E2E: browser_start with profileName', () => {
   afterAll(async () => {
     await mcp.stopBrowser();
     await mcp.close();
+    cleanupTestProfile();
   });
 
   it('starts the browser with a custom profile name', async () => {
     const result = await mcp.callTool('browser_start', {
       headless: true,
-      profileName: 'e2e-test-profile'
+      profileName: TEST_PROFILE
     });
     expect(mcp.getText(result)).toMatch(/browser started/i);
   });
@@ -29,7 +48,7 @@ describe('MCP E2E: browser_start with profileName', () => {
   it('can restart with the same profile', async () => {
     const result = await mcp.callTool('browser_start', {
       headless: true,
-      profileName: 'e2e-test-profile'
+      profileName: TEST_PROFILE
     });
     expect(mcp.getText(result)).toMatch(/browser started/i);
   });

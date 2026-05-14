@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from 'fs';
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import {
@@ -98,8 +98,15 @@ describe('isProfileLocked', () => {
     expect(isProfileLocked(tempDir)).toBe(false);
   });
 
-  it('returns true when SingletonLock exists', () => {
+  it('returns true when SingletonLock exists as a regular file', () => {
     writeFileSync(join(tempDir, 'SingletonLock'), '');
+    expect(isProfileLocked(tempDir)).toBe(true);
+  });
+
+  it('returns true when SingletonLock is a dangling symlink', () => {
+    // Chrome on Linux creates SingletonLock as a symlink to hostname-pid,
+    // which is a dangling symlink. existsSync would miss it.
+    symlinkSync('localhost-99999', join(tempDir, 'SingletonLock'));
     expect(isProfileLocked(tempDir)).toBe(true);
   });
 
