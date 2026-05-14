@@ -12,18 +12,35 @@ A lightweight Node.js/TypeScript MCP server that gives AI agents DevTools-grade 
 
 - **Node.js**: Use the version in `.nvmrc`. Supported: Node 22 (LTS) or 24 (Active LTS).
 - [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager)
-- [pnpm](https://pnpm.io) package manager
+- [pnpm](https://pnpm.io) package manager (managed via Corepack)
 - [pre-commit](https://pre-commit.com) for Git hooks (optional but recommended)
+
+### Install nvm
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+```
+
+After installation, restart your shell (or `source` your shell profile) so the `nvm` command is available. See the [nvm repository](https://github.com/nvm-sh/nvm) for the latest install script and platform-specific notes.
+
+### Install dependencies
 
 ```bash
 nvm install   # installs the version from .nvmrc (Node 24)
 nvm use
+
+# Enable Corepack and activate the pnpm version pinned in package.json
+corepack enable
+corepack prepare --activate
+
 pnpm install
 
 # Optional: Install Git hooks
 pre-commit install
 pre-commit install --hook-type pre-push
 ```
+
+Corepack ships with Node.js and uses the `packageManager` field in `package.json` to pin the pnpm version, so every contributor and CI run uses the same one.
 
 ## Quick Start
 
