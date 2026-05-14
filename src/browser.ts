@@ -30,7 +30,7 @@ export interface LaunchOptions {
   profileName?: string;
 }
 
-function isRunningInContainer(): boolean {
+export function isRunningInContainer(): boolean {
   try {
     // Docker
     if (existsSync('/.dockerenv')) return true;
@@ -48,7 +48,7 @@ function isRunningInContainer(): boolean {
   return false;
 }
 
-function shouldDisableSandbox(): boolean {
+export function shouldDisableSandbox(): boolean {
   const envOverride = process.env.AAB_CHROME_NO_SANDBOX;
   if (envOverride !== undefined) {
     return envOverride === 'true' || envOverride === '1';
@@ -61,9 +61,9 @@ function shouldDisableSandbox(): boolean {
   return process.getuid?.() === 0 || isRunningInContainer();
 }
 
-const PROFILE_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+export const PROFILE_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 
-function resolveUserDataDir(profileName: string): string {
+export function resolveUserDataDir(profileName: string): string {
   if (!PROFILE_NAME_RE.test(profileName)) {
     throw new Error(
       `Invalid profile name "${profileName}". Use only letters, digits, hyphens, and underscores.`
@@ -74,7 +74,7 @@ function resolveUserDataDir(profileName: string): string {
   return join(xdgData, 'aab', profileName);
 }
 
-function isProfileLocked(userDataDir: string): boolean {
+export function isProfileLocked(userDataDir: string): boolean {
   // Chrome writes a SingletonLock file while running
   return (
     existsSync(join(userDataDir, 'SingletonLock')) ||
