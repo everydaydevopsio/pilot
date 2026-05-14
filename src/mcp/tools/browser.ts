@@ -131,7 +131,7 @@ const startShape = {
     .string()
     .optional()
     .describe(
-      'Browser profile name. Data is stored in .aab/<profileName>/ in the working directory. Defaults to AAB_PROFILE_NAME env var or "profile1".'
+      'Browser profile name. Data is stored under $XDG_DATA_HOME/aab/<profileName>/ (default: ~/.local/share/aab/<profileName>/). Defaults to AAB_PROFILE_NAME env var or "profile1".'
     )
 };
 

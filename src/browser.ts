@@ -1,9 +1,9 @@
 import CDP from 'chrome-remote-interface';
 import type { Client } from 'chrome-remote-interface';
 import { spawn, type ChildProcess } from 'child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 import * as net from 'net';
-import { tmpdir } from 'os';
+import { homedir } from 'os';
 import { join } from 'path';
 import { getLogger } from './util/logger.js';
 import type { Config } from './util/config.js';
@@ -32,9 +32,16 @@ export interface LaunchOptions {
 
 function isRunningInContainer(): boolean {
   try {
+    // Docker
     if (existsSync('/.dockerenv')) return true;
-    const cgroup = readFileSync('/proc/1/cgroup', 'utf8');
-    if (/docker|containerd|kubepods|lxc/.test(cgroup)) return true;
+    // Podman
+    if (existsSync('/run/.containerenv')) return true;
+    // cgroup v1: look for container runtime markers
+    const cgroupV1 = readFileSync('/proc/1/cgroup', 'utf8');
+    if (/docker|containerd|kubepods|lxc/.test(cgroupV1)) return true;
+    // cgroup v2: check mountinfo for overlay/fuse mounts typical of containers
+    const mountinfo = readFileSync('/proc/self/mountinfo', 'utf8');
+    if (/\/docker\/containers\/|overlay.*upperdir/.test(mountinfo)) return true;
   } catch {
     // /proc not available or not readable — not in a container
   }
@@ -46,7 +53,33 @@ function shouldDisableSandbox(): boolean {
   if (envOverride !== undefined) {
     return envOverride === 'true' || envOverride === '1';
   }
+  // --no-sandbox is relevant on Linux and (in theory) Windows.
+  // macOS uses a different sandboxing model and Chrome ignores the flag.
+  if (process.platform !== 'linux' && process.platform !== 'win32') {
+    return false;
+  }
   return process.getuid?.() === 0 || isRunningInContainer();
+}
+
+const PROFILE_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+
+function resolveUserDataDir(profileName: string): string {
+  if (!PROFILE_NAME_RE.test(profileName)) {
+    throw new Error(
+      `Invalid profile name "${profileName}". Use only letters, digits, hyphens, and underscores.`
+    );
+  }
+  const xdgData =
+    process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share');
+  return join(xdgData, 'aab', profileName);
+}
+
+function isProfileLocked(userDataDir: string): boolean {
+  // Chrome writes a SingletonLock file while running
+  return (
+    existsSync(join(userDataDir, 'SingletonLock')) ||
+    existsSync(join(userDataDir, 'lockfile'))
+  );
 }
 
 export class BrowserManager {
@@ -64,7 +97,6 @@ export class BrowserManager {
   private chromeProcess: ChildProcess | null = null;
   private launchedCdpPort: number | null = null;
   private launchedUserDataDir: string | null = null;
-  private isTemporaryUserDataDir = false;
 
   constructor(private readonly config: Config) {
     this.retryMs = config.cdpRetryMs;
@@ -160,17 +192,15 @@ export class BrowserManager {
     const chromePath = BrowserManager.findChromeExecutable(opts.chromePath);
 
     const profileName = opts.profileName ?? this.config.profileName;
-    let userDataDir: string;
-    let isTemp: boolean;
+    const userDataDir = resolveUserDataDir(profileName);
 
-    if (profileName) {
-      userDataDir = join(process.cwd(), '.aab', profileName);
-      mkdirSync(userDataDir, { recursive: true });
-      isTemp = false;
-    } else {
-      userDataDir = mkdtempSync(join(tmpdir(), 'aab-chrome-'));
-      isTemp = true;
+    if (isProfileLocked(userDataDir)) {
+      throw new Error(
+        `Profile "${profileName}" is already in use by another browser instance.`
+      );
     }
+
+    mkdirSync(userDataDir, { recursive: true });
 
     const args = [
       `--remote-debugging-port=${port}`,
@@ -187,9 +217,10 @@ export class BrowserManager {
 
     if (process.platform === 'linux') {
       args.push('--disable-dev-shm-usage');
-      if (shouldDisableSandbox()) {
-        args.push('--no-sandbox');
-      }
+    }
+
+    if (shouldDisableSandbox()) {
+      args.push('--no-sandbox');
     }
 
     logger.info(
@@ -204,7 +235,6 @@ export class BrowserManager {
 
     this.launchedCdpPort = port;
     this.launchedUserDataDir = userDataDir;
-    this.isTemporaryUserDataDir = isTemp;
 
     this.chromeProcess.on('exit', (code) => {
       logger.warn({ code }, 'Chrome process exited');
@@ -518,15 +548,7 @@ export class BrowserManager {
   }
 
   private cleanupUserDataDir(): void {
-    if (this.launchedUserDataDir && this.isTemporaryUserDataDir) {
-      try {
-        rmSync(this.launchedUserDataDir, { recursive: true, force: true });
-      } catch {
-        // best-effort cleanup
-      }
-    }
     this.launchedUserDataDir = null;
-    this.isTemporaryUserDataDir = false;
   }
 
   async destroy(): Promise<void> {
