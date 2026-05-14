@@ -1,7 +1,7 @@
 import CDP from 'chrome-remote-interface';
 import type { Client } from 'chrome-remote-interface';
 import { spawn, type ChildProcess } from 'child_process';
-import { existsSync, lstatSync, mkdirSync, readFileSync } from 'fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, unlinkSync } from 'fs';
 import * as net from 'net';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -559,6 +559,17 @@ export class BrowserManager {
   }
 
   private cleanupUserDataDir(): void {
+    if (this.launchedUserDataDir) {
+      // Remove stale lock files left behind after Chrome exits so the
+      // profile can be reused without a false "already in use" error.
+      for (const lockName of ['SingletonLock', 'lockfile']) {
+        try {
+          unlinkSync(join(this.launchedUserDataDir, lockName));
+        } catch {
+          // lock file may not exist — that's fine
+        }
+      }
+    }
     this.launchedUserDataDir = null;
   }
 
