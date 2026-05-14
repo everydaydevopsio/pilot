@@ -60,7 +60,9 @@ export class McpTestClient {
     return result.tools.map((t) => t.name);
   }
 
-  async startBrowser(headless = true): Promise<void> {
+  async startBrowser(
+    headless = process.env.AAB_HEADLESS === 'false' ? false : true
+  ): Promise<void> {
     const args: Record<string, unknown> = { headless };
     // AAB_CHROME_PATH is injected by docker-compose.e2e.yml for the mcp profile
     if (process.env.AAB_CHROME_PATH) {
