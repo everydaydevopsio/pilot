@@ -1,7 +1,7 @@
 import CDP from 'chrome-remote-interface';
 import type { Client } from 'chrome-remote-interface';
 import { spawn, type ChildProcess } from 'child_process';
-import { existsSync, mkdtempSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs';
 import * as net from 'net';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -27,6 +27,26 @@ export interface BrowserState {
 export interface LaunchOptions {
   headless?: boolean;
   chromePath?: string;
+  profileName?: string;
+}
+
+function isRunningInContainer(): boolean {
+  try {
+    if (existsSync('/.dockerenv')) return true;
+    const cgroup = readFileSync('/proc/1/cgroup', 'utf8');
+    if (/docker|containerd|kubepods|lxc/.test(cgroup)) return true;
+  } catch {
+    // /proc not available or not readable — not in a container
+  }
+  return false;
+}
+
+function shouldDisableSandbox(): boolean {
+  const envOverride = process.env.AAB_CHROME_NO_SANDBOX;
+  if (envOverride !== undefined) {
+    return envOverride === 'true' || envOverride === '1';
+  }
+  return process.getuid?.() === 0 || isRunningInContainer();
 }
 
 export class BrowserManager {
@@ -44,6 +64,7 @@ export class BrowserManager {
   private chromeProcess: ChildProcess | null = null;
   private launchedCdpPort: number | null = null;
   private launchedUserDataDir: string | null = null;
+  private isTemporaryUserDataDir = false;
 
   constructor(private readonly config: Config) {
     this.retryMs = config.cdpRetryMs;
@@ -137,7 +158,19 @@ export class BrowserManager {
     const logger = getLogger();
     const port = await BrowserManager.findFreePort();
     const chromePath = BrowserManager.findChromeExecutable(opts.chromePath);
-    const userDataDir = mkdtempSync(join(tmpdir(), 'aab-chrome-'));
+
+    const profileName = opts.profileName ?? this.config.profileName;
+    let userDataDir: string;
+    let isTemp: boolean;
+
+    if (profileName) {
+      userDataDir = join(process.cwd(), '.aab', profileName);
+      mkdirSync(userDataDir, { recursive: true });
+      isTemp = false;
+    } else {
+      userDataDir = mkdtempSync(join(tmpdir(), 'aab-chrome-'));
+      isTemp = true;
+    }
 
     const args = [
       `--remote-debugging-port=${port}`,
@@ -153,7 +186,10 @@ export class BrowserManager {
     }
 
     if (process.platform === 'linux') {
-      args.push('--no-sandbox', '--disable-dev-shm-usage');
+      args.push('--disable-dev-shm-usage');
+      if (shouldDisableSandbox()) {
+        args.push('--no-sandbox');
+      }
     }
 
     logger.info(
@@ -168,6 +204,7 @@ export class BrowserManager {
 
     this.launchedCdpPort = port;
     this.launchedUserDataDir = userDataDir;
+    this.isTemporaryUserDataDir = isTemp;
 
     this.chromeProcess.on('exit', (code) => {
       logger.warn({ code }, 'Chrome process exited');
@@ -481,14 +518,15 @@ export class BrowserManager {
   }
 
   private cleanupUserDataDir(): void {
-    if (this.launchedUserDataDir) {
+    if (this.launchedUserDataDir && this.isTemporaryUserDataDir) {
       try {
         rmSync(this.launchedUserDataDir, { recursive: true, force: true });
       } catch {
         // best-effort cleanup
       }
-      this.launchedUserDataDir = null;
     }
+    this.launchedUserDataDir = null;
+    this.isTemporaryUserDataDir = false;
   }
 
   async destroy(): Promise<void> {

@@ -50,6 +50,10 @@ async function run(): Promise<void> {
     console.log(
       '  AAB_LOG_LEVEL         Log level: trace|debug|info|warn|error|fatal (default: info)'
     );
+    console.log(
+      '  AAB_PROFILE_NAME      Browser profile name (default: profile1)'
+    );
+    console.log('  AAB_CHROME_NO_SANDBOX Override Chrome sandbox (true/false)');
     return;
   }
 

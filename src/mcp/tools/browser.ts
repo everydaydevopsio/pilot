@@ -126,7 +126,13 @@ const startShape = {
   chromePath: z
     .string()
     .optional()
-    .describe('Path to Chrome executable (auto-detected if omitted)')
+    .describe('Path to Chrome executable (auto-detected if omitted)'),
+  profileName: z
+    .string()
+    .optional()
+    .describe(
+      'Browser profile name. Data is stored in .aab/<profileName>/ in the working directory. Defaults to AAB_PROFILE_NAME env var or "profile1".'
+    )
 };
 
 const newTabShape = {
@@ -165,7 +171,7 @@ export function registerBrowserTools(
     'browser_start',
     'Launch the Chrome browser. Call this before using any other browser tools.',
     startShape,
-    async ({ headless, chromePath }) => {
+    async ({ headless, chromePath, profileName }) => {
       if (context.manager?.isConnected()) {
         return {
           content: [
@@ -183,7 +189,7 @@ export function registerBrowserTools(
       }
 
       const manager = makeBrowserManager();
-      await manager.launch({ headless, chromePath });
+      await manager.launch({ headless, chromePath, profileName });
       context.manager = manager;
 
       return {
