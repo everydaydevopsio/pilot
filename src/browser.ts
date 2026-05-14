@@ -36,6 +36,7 @@ export class BrowserManager {
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private retryMs: number;
   private destroyed = false;
+  private intentionalClose = false;
   private eventCallback: BrowserEventCallback | null = null;
   private pendingNetworkRequests = new Set<string>();
   private networkIdleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -256,6 +257,10 @@ export class BrowserManager {
 
   private attachEventListeners(client: Client): void {
     client.on('disconnect', () => {
+      if (this.intentionalClose) {
+        this.intentionalClose = false;
+        return;
+      }
       const logger = getLogger();
       logger.warn('Chrome disconnected');
       this.client = null;
@@ -435,8 +440,15 @@ export class BrowserManager {
 
     // Close old client connection (but not the tab)
     if (this.client) {
+      this.intentionalClose = true;
       await this.client.close();
       this.client = null;
+    }
+
+    // Clear any pending reconnect from a prior disconnect
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
     }
 
     // Connect to the new target
