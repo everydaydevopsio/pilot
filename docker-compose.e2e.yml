@@ -7,7 +7,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.e2e
-    command: pnpm run test:e2e:mcp
+    command: pnpm run test:e2e:mcp:ci
     environment:
       # chromium is installed in Dockerfile.e2e (works on amd64 and arm64)
       - AAB_CHROME_PATH=/usr/bin/chromium
