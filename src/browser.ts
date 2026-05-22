@@ -1,7 +1,7 @@
 import CDP from 'chrome-remote-interface';
 import type { Client } from 'chrome-remote-interface';
 import { spawn, type ChildProcess } from 'child_process';
-import { existsSync, lstatSync, mkdirSync, readFileSync, unlinkSync } from 'fs';
+import { existsSync, lstatSync, mkdirSync, unlinkSync } from 'fs';
 import * as net from 'net';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -30,35 +30,37 @@ export interface LaunchOptions {
   profileName?: string;
 }
 
-export function isRunningInContainer(): boolean {
-  try {
-    // Docker
-    if (existsSync('/.dockerenv')) return true;
-    // Podman
-    if (existsSync('/run/.containerenv')) return true;
-    // cgroup v1: look for container runtime markers
-    const cgroupV1 = readFileSync('/proc/1/cgroup', 'utf8');
-    if (/docker|containerd|kubepods|lxc/.test(cgroupV1)) return true;
-    // cgroup v2: check mountinfo for overlay/fuse mounts typical of containers
-    const mountinfo = readFileSync('/proc/self/mountinfo', 'utf8');
-    if (/\/docker\/containers\/|overlay.*upperdir/.test(mountinfo)) return true;
-  } catch {
-    // /proc not available or not readable — not in a container
-  }
-  return false;
-}
+export type SandboxDecision =
+  | { disable: false }
+  | { disable: true; reason: 'env_override' | 'root_user' };
 
-export function shouldDisableSandbox(): boolean {
+export function sandboxDecision(): SandboxDecision {
   const envOverride = process.env.AAB_CHROME_NO_SANDBOX;
   if (envOverride !== undefined) {
-    return envOverride === 'true' || envOverride === '1';
+    const truthy = envOverride === 'true' || envOverride === '1';
+    return truthy
+      ? { disable: true, reason: 'env_override' }
+      : { disable: false };
   }
   // --no-sandbox is relevant on Linux and (in theory) Windows.
   // macOS uses a different sandboxing model and Chrome ignores the flag.
   if (process.platform !== 'linux' && process.platform !== 'win32') {
-    return false;
+    return { disable: false };
   }
-  return process.getuid?.() === 0 || isRunningInContainer();
+  // Auto-apply only when running as root. Chrome's user-namespace sandbox
+  // typically fails as root in containers, and root is the most reliable
+  // signal that the sandbox cannot work. Non-root processes (including
+  // non-root in containers) usually have a working sandbox — set
+  // AAB_CHROME_NO_SANDBOX=true to opt in if a specific environment
+  // genuinely requires it.
+  if (process.getuid?.() === 0) {
+    return { disable: true, reason: 'root_user' };
+  }
+  return { disable: false };
+}
+
+export function shouldDisableSandbox(): boolean {
+  return sandboxDecision().disable;
 }
 
 export const PROFILE_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
@@ -230,12 +232,22 @@ export class BrowserManager {
       args.push('--disable-dev-shm-usage');
     }
 
-    if (shouldDisableSandbox()) {
+    const sandbox = sandboxDecision();
+    if (sandbox.disable) {
       args.push('--no-sandbox');
+      logger.warn(
+        { reason: sandbox.reason },
+        'Chrome will run with --no-sandbox. The renderer sandbox is disabled; any page the agent visits runs with the same privileges as this process. Set AAB_CHROME_NO_SANDBOX=false to override, or run as a non-root user to keep the sandbox enabled.'
+      );
     }
 
     logger.info(
-      { chromePath, port, headless: opts.headless ?? false },
+      {
+        chromePath,
+        port,
+        headless: opts.headless ?? false,
+        sandbox: sandbox.disable ? 'disabled' : 'enabled'
+      },
       'Launching Chrome'
     );
 
