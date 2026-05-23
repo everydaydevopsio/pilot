@@ -120,15 +120,16 @@ Or add to `.mcp.json` in your project:
 
 All configuration via environment variables.
 
-| Env var                 | Default     | Description                                                                                                                                                                                   |
-| ----------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AAB_CDP_PORT`          | `9222`      | CDP port when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                                 |
-| `AAB_CDP_HOST`          | `127.0.0.1` | CDP host when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                                 |
-| `AAB_LOG_LEVEL`         | `info`      | Pino log level                                                                                                                                                                                |
-| `AAB_CHROME_PATH`       | (auto)      | Path to Chrome executable                                                                                                                                                                     |
-| `AAB_HEADLESS`          | `true`      | Run Chrome headless                                                                                                                                                                           |
-| `AAB_MCP_BUFFER_SIZE`   | `1000`      | Console message buffer size                                                                                                                                                                   |
-| `AAB_CHROME_NO_SANDBOX` | (auto)      | Force `--no-sandbox` on/off. Accepts `true`/`1` or `false`/`0`. When unset, the flag is auto-applied only when running as root on Linux/Windows. See [Chrome sandbox](#chrome-sandbox) below. |
+| Env var                 | Default     | Description                                                                                                                                                                           |
+| ----------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AAB_CDP_PORT`          | `9222`      | CDP port when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                         |
+| `AAB_CDP_HOST`          | `127.0.0.1` | CDP host when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                         |
+| `AAB_LOG_LEVEL`         | `info`      | Pino log level                                                                                                                                                                        |
+| `AAB_CHROME_PATH`       | (auto)      | Path to Chrome executable                                                                                                                                                             |
+| `AAB_HEADLESS`          | `true`      | Run Chrome headless                                                                                                                                                                   |
+| `AAB_MCP_BUFFER_SIZE`   | `1000`      | Console message buffer size                                                                                                                                                           |
+| `AAB_PROFILE_NAME`      | `profile1`  | Persistent browser profile name. Profiles are stored under `$XDG_DATA_HOME/aab/<name>` (default `~/.local/share/aab/<name>`).                                                         |
+| `AAB_CHROME_NO_SANDBOX` | (auto)      | Force `--no-sandbox` on/off. Accepts `true`/`1` or `false`/`0`. When unset, the flag is auto-applied only when running as root on Linux. See [Chrome sandbox](#chrome-sandbox) below. |
 
 > **Tip — seeing the browser window:** By default Chrome runs headless (no visible window). To watch the browser while the agent works, ask the AI agent: _"set headless to false"_ (or _"run Chrome with a visible window"_). The agent will set `AAB_HEADLESS=false` before calling `browser_start`, and a Chrome window will appear on your desktop.
 
@@ -136,7 +137,7 @@ All configuration via environment variables.
 
 The Chrome renderer sandbox is the primary defense against a compromised page (or page content reaching the agent via prompt injection) running code with the privileges of this process. An AI agent that visits arbitrary URLs is precisely the case where the sandbox matters most, so the server keeps it enabled by default.
 
-`--no-sandbox` is auto-applied only when the server is running as **root** on Linux or Windows — the most common case where Chrome's user-namespace sandbox fails to initialize. In every other case (non-root user, macOS, non-root inside a container) the sandbox stays on.
+`--no-sandbox` is auto-applied only when the server is running as **root** on Linux — the most common case where Chrome's user-namespace sandbox fails to initialize. In every other case (non-root user, macOS, Windows, non-root inside a container) the sandbox stays on.
 
 Override the auto-detection with `AAB_CHROME_NO_SANDBOX`:
 

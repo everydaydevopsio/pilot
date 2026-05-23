@@ -76,12 +76,18 @@ export function resolveUserDataDir(profileName: string): string {
   return join(xdgData, 'aab', profileName);
 }
 
-function fileOrSymlinkExists(path: string): boolean {
+function fileOrSymlinkExists(filePath: string): boolean {
   try {
-    lstatSync(path);
+    lstatSync(filePath);
     return true;
-  } catch {
-    return false;
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      return false;
+    }
+    // Permission errors (EACCES) or other unexpected failures — treat as
+    // "exists" so callers don't silently ignore an inaccessible lock file.
+    return true;
   }
 }
 
@@ -224,7 +230,8 @@ export class BrowserManager {
       '--disable-extensions'
     ];
 
-    if (opts.headless ?? false) {
+    const headless = opts.headless ?? this.config.headless;
+    if (headless) {
       args.push('--headless=new', '--disable-gpu');
     }
 
@@ -245,7 +252,7 @@ export class BrowserManager {
       {
         chromePath,
         port,
-        headless: opts.headless ?? false,
+        headless,
         sandbox: sandbox.disable ? 'disabled' : 'enabled'
       },
       'Launching Chrome'
@@ -599,13 +606,23 @@ export class BrowserManager {
       this.client = null;
     }
     if (this.chromeProcess) {
+      const proc = this.chromeProcess;
+      this.chromeProcess = null;
+      this.launchedCdpPort = null;
       try {
-        this.chromeProcess.kill();
+        proc.kill();
       } catch {
         // process may have already exited
       }
-      this.chromeProcess = null;
-      this.launchedCdpPort = null;
+      // Wait for Chrome to fully exit before removing lock files so a
+      // concurrent launch cannot race against a still-running process.
+      await new Promise<void>((resolve) => {
+        if (proc.exitCode !== null || proc.killed) {
+          resolve();
+        } else {
+          proc.once('exit', () => resolve());
+        }
+      });
       this.cleanupUserDataDir();
     }
   }
