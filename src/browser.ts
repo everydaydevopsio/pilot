@@ -618,12 +618,25 @@ export class BrowserManager {
       }
       // Wait for Chrome to fully exit before removing lock files so a
       // concurrent launch cannot race against a still-running process.
+      // `proc.killed` only confirms a signal was delivered, not that the
+      // process is gone — only `exitCode !== null` or the `exit` event do.
       await new Promise<void>((resolve) => {
-        if (proc.exitCode !== null || proc.killed) {
+        if (proc.exitCode !== null) {
           resolve();
-        } else {
-          proc.once('exit', () => resolve());
+          return;
         }
+        const timer = setTimeout(() => {
+          try {
+            proc.kill('SIGKILL');
+          } catch {
+            // process may have already exited
+          }
+          resolve();
+        }, 5000);
+        proc.once('exit', () => {
+          clearTimeout(timer);
+          resolve();
+        });
       });
       this.cleanupUserDataDir();
     }

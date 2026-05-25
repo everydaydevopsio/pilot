@@ -41,7 +41,7 @@ describe('shouldDisableSandbox', () => {
     expect(shouldDisableSandbox()).toBe(false);
   });
 
-  it('returns false on macOS regardless of env', () => {
+  it('returns false on macOS when env is unset', () => {
     delete process.env.AAB_CHROME_NO_SANDBOX;
     Object.defineProperty(process, 'platform', { value: 'darwin' });
     expect(shouldDisableSandbox()).toBe(false);
