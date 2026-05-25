@@ -7,6 +7,7 @@ describe('loadConfig', () => {
     delete process.env.AAB_LOG_LEVEL;
     delete process.env.AAB_CDP_RETRY_MS;
     delete process.env.AAB_CDP_MAX_RETRY_MS;
+    delete process.env.AAB_PROFILE_NAME;
     delete process.env.AAB_HEADLESS;
   });
 
@@ -46,6 +47,23 @@ describe('loadConfig', () => {
 
   it('throws on invalid log level', () => {
     expect(() => loadConfig({ logLevel: 'superverbose' })).toThrow();
+  });
+
+  it('defaults profileName to profile1', () => {
+    const config = loadConfig();
+    expect(config.profileName).toBe('profile1');
+  });
+
+  it('reads AAB_PROFILE_NAME from env', () => {
+    process.env.AAB_PROFILE_NAME = 'custom-profile';
+    const config = loadConfig();
+    expect(config.profileName).toBe('custom-profile');
+  });
+
+  it('CLI arg profileName overrides env', () => {
+    process.env.AAB_PROFILE_NAME = 'env-profile';
+    const config = loadConfig({ profileName: 'cli-profile' });
+    expect(config.profileName).toBe('cli-profile');
   });
 
   it('headless defaults to true when AAB_HEADLESS is unset', () => {

@@ -9,7 +9,8 @@ const ConfigSchema = z.object({
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
     .default('info'),
   chromePath: z.string().optional(),
-  headless: z.boolean().default(true)
+  headless: z.boolean().default(true),
+  profileName: z.string().default('profile1')
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -20,6 +21,7 @@ export interface CliArgs {
   logLevel?: string;
   chromePath?: string;
   headless?: boolean;
+  profileName?: string;
 }
 
 export function loadConfig(cliArgs: CliArgs = {}): Config {
@@ -39,7 +41,8 @@ export function loadConfig(cliArgs: CliArgs = {}): Config {
     headless:
       process.env.AAB_HEADLESS !== undefined
         ? process.env.AAB_HEADLESS !== 'false'
-        : undefined
+        : undefined,
+    profileName: process.env.AAB_PROFILE_NAME
   };
 
   const merged = {
@@ -49,7 +52,8 @@ export function loadConfig(cliArgs: CliArgs = {}): Config {
     cdpMaxRetryMs: env.cdpMaxRetryMs,
     logLevel: cliArgs.logLevel ?? env.logLevel,
     chromePath: cliArgs.chromePath ?? env.chromePath,
-    headless: cliArgs.headless ?? env.headless
+    headless: cliArgs.headless ?? env.headless,
+    profileName: cliArgs.profileName ?? env.profileName
   };
 
   return ConfigSchema.parse(merged);

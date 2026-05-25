@@ -142,17 +142,21 @@ describe('MCP E2E: tab management tools', () => {
       expect(otherTab).toBeDefined();
       await mcp.callTool('browser_switch_tab', { targetId: otherTab.targetId });
 
-      const beforeResult = await mcp.callTool('browser_list_tabs');
-      const beforeTabs = JSON.parse(mcp.getText(beforeResult));
-
       const closeResult = await mcp.callTool('browser_close_tab', {
         targetId: newTabId
       });
       expect(mcp.getText(closeResult)).toMatch(/closed/i);
 
+      // Allow Chrome time to process the tab close in non-headless mode
+      await mcp.callTool('browser_wait', { ms: 500 });
+
+      // Verify the closed tab is no longer in the list
       const afterResult = await mcp.callTool('browser_list_tabs');
       const afterTabs = JSON.parse(mcp.getText(afterResult));
-      expect(afterTabs.length).toBe(beforeTabs.length - 1);
+      const closedTab = afterTabs.find(
+        (t: { targetId: string }) => t.targetId === newTabId
+      );
+      expect(closedTab).toBeUndefined();
     });
 
     it('returns an error when closing the active tab', async () => {

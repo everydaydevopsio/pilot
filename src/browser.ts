@@ -1,9 +1,9 @@
 import CDP from 'chrome-remote-interface';
 import type { Client } from 'chrome-remote-interface';
 import { spawn, type ChildProcess } from 'child_process';
-import { existsSync, mkdtempSync, rmSync } from 'fs';
+import { existsSync, lstatSync, mkdirSync, unlinkSync } from 'fs';
 import * as net from 'net';
-import { tmpdir } from 'os';
+import { homedir } from 'os';
 import { join } from 'path';
 import { getLogger } from './util/logger.js';
 import type { Config } from './util/config.js';
@@ -27,6 +27,78 @@ export interface BrowserState {
 export interface LaunchOptions {
   headless?: boolean;
   chromePath?: string;
+  profileName?: string;
+}
+
+export type SandboxDecision =
+  | { disable: false }
+  | { disable: true; reason: 'env_override' | 'root_user' };
+
+export function sandboxDecision(): SandboxDecision {
+  const envOverride = process.env.AAB_CHROME_NO_SANDBOX;
+  if (envOverride !== undefined) {
+    const truthy = envOverride === 'true' || envOverride === '1';
+    return truthy
+      ? { disable: true, reason: 'env_override' }
+      : { disable: false };
+  }
+  // --no-sandbox is relevant on Linux and (in theory) Windows.
+  // macOS uses a different sandboxing model and Chrome ignores the flag.
+  if (process.platform !== 'linux' && process.platform !== 'win32') {
+    return { disable: false };
+  }
+  // Auto-apply only when running as root. Chrome's user-namespace sandbox
+  // typically fails as root in containers, and root is the most reliable
+  // signal that the sandbox cannot work. Non-root processes (including
+  // non-root in containers) usually have a working sandbox — set
+  // AAB_CHROME_NO_SANDBOX=true to opt in if a specific environment
+  // genuinely requires it.
+  if (process.getuid?.() === 0) {
+    return { disable: true, reason: 'root_user' };
+  }
+  return { disable: false };
+}
+
+export function shouldDisableSandbox(): boolean {
+  return sandboxDecision().disable;
+}
+
+export const PROFILE_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+
+export function resolveUserDataDir(profileName: string): string {
+  if (!PROFILE_NAME_RE.test(profileName)) {
+    throw new Error(
+      `Invalid profile name "${profileName}". Use only letters, digits, hyphens, and underscores.`
+    );
+  }
+  const xdgData =
+    process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share');
+  return join(xdgData, 'aab', profileName);
+}
+
+function fileOrSymlinkExists(filePath: string): boolean {
+  try {
+    lstatSync(filePath);
+    return true;
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      return false;
+    }
+    // Permission errors (EACCES) or other unexpected failures — treat as
+    // "exists" so callers don't silently ignore an inaccessible lock file.
+    return true;
+  }
+}
+
+export function isProfileLocked(userDataDir: string): boolean {
+  // Chrome writes SingletonLock as a symlink on Linux (target: hostname-pid).
+  // The symlink is dangling, so existsSync (which follows symlinks) returns
+  // false. Use lstatSync to detect the symlink itself.
+  return (
+    fileOrSymlinkExists(join(userDataDir, 'SingletonLock')) ||
+    existsSync(join(userDataDir, 'lockfile'))
+  );
 }
 
 export class BrowserManager {
@@ -137,7 +209,17 @@ export class BrowserManager {
     const logger = getLogger();
     const port = await BrowserManager.findFreePort();
     const chromePath = BrowserManager.findChromeExecutable(opts.chromePath);
-    const userDataDir = mkdtempSync(join(tmpdir(), 'aab-chrome-'));
+
+    const profileName = opts.profileName ?? this.config.profileName;
+    const userDataDir = resolveUserDataDir(profileName);
+
+    if (isProfileLocked(userDataDir)) {
+      throw new Error(
+        `Profile "${profileName}" is already in use by another browser instance.`
+      );
+    }
+
+    mkdirSync(userDataDir, { recursive: true });
 
     const args = [
       `--remote-debugging-port=${port}`,
@@ -154,10 +236,27 @@ export class BrowserManager {
     }
 
     if (process.platform === 'linux') {
-      args.push('--no-sandbox', '--disable-dev-shm-usage');
+      args.push('--disable-dev-shm-usage');
     }
 
-    logger.info({ chromePath, port, headless }, 'Launching Chrome');
+    const sandbox = sandboxDecision();
+    if (sandbox.disable) {
+      args.push('--no-sandbox');
+      logger.warn(
+        { reason: sandbox.reason },
+        'Chrome will run with --no-sandbox. The renderer sandbox is disabled; any page the agent visits runs with the same privileges as this process. Set AAB_CHROME_NO_SANDBOX=false to override, or run as a non-root user to keep the sandbox enabled.'
+      );
+    }
+
+    logger.info(
+      {
+        chromePath,
+        port,
+        headless,
+        sandbox: sandbox.disable ? 'disabled' : 'enabled'
+      },
+      'Launching Chrome'
+    );
 
     this.chromeProcess = spawn(chromePath, args, {
       stdio: 'ignore',
@@ -482,13 +581,17 @@ export class BrowserManager {
 
   private cleanupUserDataDir(): void {
     if (this.launchedUserDataDir) {
-      try {
-        rmSync(this.launchedUserDataDir, { recursive: true, force: true });
-      } catch {
-        // best-effort cleanup
+      // Remove stale lock files left behind after Chrome exits so the
+      // profile can be reused without a false "already in use" error.
+      for (const lockName of ['SingletonLock', 'lockfile']) {
+        try {
+          unlinkSync(join(this.launchedUserDataDir, lockName));
+        } catch {
+          // lock file may not exist — that's fine
+        }
       }
-      this.launchedUserDataDir = null;
     }
+    this.launchedUserDataDir = null;
   }
 
   async destroy(): Promise<void> {
@@ -505,13 +608,36 @@ export class BrowserManager {
       this.client = null;
     }
     if (this.chromeProcess) {
+      const proc = this.chromeProcess;
+      this.chromeProcess = null;
+      this.launchedCdpPort = null;
       try {
-        this.chromeProcess.kill();
+        proc.kill();
       } catch {
         // process may have already exited
       }
-      this.chromeProcess = null;
-      this.launchedCdpPort = null;
+      // Wait for Chrome to fully exit before removing lock files so a
+      // concurrent launch cannot race against a still-running process.
+      // `proc.killed` only confirms a signal was delivered, not that the
+      // process is gone — only `exitCode !== null` or the `exit` event do.
+      await new Promise<void>((resolve) => {
+        if (proc.exitCode !== null) {
+          resolve();
+          return;
+        }
+        const timer = setTimeout(() => {
+          try {
+            proc.kill('SIGKILL');
+          } catch {
+            // process may have already exited
+          }
+          resolve();
+        }, 5000);
+        proc.once('exit', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
       this.cleanupUserDataDir();
     }
   }
