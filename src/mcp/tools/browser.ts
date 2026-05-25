@@ -121,8 +121,10 @@ const waitShape = {
 const startShape = {
   headless: z
     .boolean()
-    .default(true)
-    .describe('Run Chrome headless (default: true)'),
+    .optional()
+    .describe(
+      'Run Chrome headless. When omitted, falls back to AAB_HEADLESS (default: true).'
+    ),
   chromePath: z
     .string()
     .optional()
@@ -189,14 +191,18 @@ export function registerBrowserTools(
       }
 
       const manager = makeBrowserManager();
-      await manager.launch({ headless, chromePath, profileName });
+      const { headless: effectiveHeadless } = await manager.launch({
+        headless,
+        chromePath,
+        profileName
+      });
       context.manager = manager;
 
       return {
         content: [
           {
             type: 'text' as const,
-            text: `Browser started${headless ? ' (headless)' : ' (visible)'}.`
+            text: `Browser started${effectiveHeadless ? ' (headless)' : ' (visible)'}.`
           }
         ]
       };

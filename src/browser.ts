@@ -196,7 +196,7 @@ export class BrowserManager {
     });
   }
 
-  async launch(opts: LaunchOptions = {}): Promise<void> {
+  async launch(opts: LaunchOptions = {}): Promise<{ headless: boolean }> {
     if (this.chromeProcess) {
       throw new Error('Chrome is already launched');
     }
@@ -275,6 +275,8 @@ export class BrowserManager {
 
     await this.waitForChromeReady(port);
     await this.connect();
+
+    return { headless };
   }
 
   private async waitForChromeReady(

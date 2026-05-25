@@ -8,6 +8,7 @@ describe('loadConfig', () => {
     delete process.env.AAB_CDP_RETRY_MS;
     delete process.env.AAB_CDP_MAX_RETRY_MS;
     delete process.env.AAB_PROFILE_NAME;
+    delete process.env.AAB_HEADLESS;
   });
 
   it('returns defaults when no args or env vars', () => {
@@ -63,5 +64,22 @@ describe('loadConfig', () => {
     process.env.AAB_PROFILE_NAME = 'env-profile';
     const config = loadConfig({ profileName: 'cli-profile' });
     expect(config.profileName).toBe('cli-profile');
+  });
+
+  it('headless defaults to true when AAB_HEADLESS is unset', () => {
+    const config = loadConfig();
+    expect(config.headless).toBe(true);
+  });
+
+  it('AAB_HEADLESS=false sets headless to false', () => {
+    process.env.AAB_HEADLESS = 'false';
+    const config = loadConfig();
+    expect(config.headless).toBe(false);
+  });
+
+  it('AAB_HEADLESS=true sets headless to true', () => {
+    process.env.AAB_HEADLESS = 'true';
+    const config = loadConfig();
+    expect(config.headless).toBe(true);
   });
 });
