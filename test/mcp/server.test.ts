@@ -7,7 +7,7 @@ jest.mock('../../src/browser.js', () => {
     BrowserManager: jest.fn().mockImplementation(() => ({
       isConnected: jest.fn().mockReturnValue(false),
       getClient: jest.fn().mockReturnValue(null),
-      launch: jest.fn().mockResolvedValue(undefined),
+      launch: jest.fn().mockResolvedValue({ headless: true }),
       destroy: jest.fn().mockResolvedValue(undefined),
       setEventCallback: jest.fn()
     }))

@@ -7,6 +7,7 @@ describe('loadConfig', () => {
     delete process.env.AAB_LOG_LEVEL;
     delete process.env.AAB_CDP_RETRY_MS;
     delete process.env.AAB_CDP_MAX_RETRY_MS;
+    delete process.env.AAB_HEADLESS;
   });
 
   it('returns defaults when no args or env vars', () => {
@@ -45,5 +46,22 @@ describe('loadConfig', () => {
 
   it('throws on invalid log level', () => {
     expect(() => loadConfig({ logLevel: 'superverbose' })).toThrow();
+  });
+
+  it('headless defaults to true when AAB_HEADLESS is unset', () => {
+    const config = loadConfig();
+    expect(config.headless).toBe(true);
+  });
+
+  it('AAB_HEADLESS=false sets headless to false', () => {
+    process.env.AAB_HEADLESS = 'false';
+    const config = loadConfig();
+    expect(config.headless).toBe(false);
+  });
+
+  it('AAB_HEADLESS=true sets headless to true', () => {
+    process.env.AAB_HEADLESS = 'true';
+    const config = loadConfig();
+    expect(config.headless).toBe(true);
   });
 });

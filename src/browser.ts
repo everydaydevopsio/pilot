@@ -124,7 +124,7 @@ export class BrowserManager {
     });
   }
 
-  async launch(opts: LaunchOptions = {}): Promise<void> {
+  async launch(opts: LaunchOptions = {}): Promise<{ headless: boolean }> {
     if (this.chromeProcess) {
       throw new Error('Chrome is already launched');
     }
@@ -148,7 +148,8 @@ export class BrowserManager {
       '--disable-extensions'
     ];
 
-    if (opts.headless ?? false) {
+    const headless = opts.headless ?? this.config.headless;
+    if (headless) {
       args.push('--headless=new', '--disable-gpu');
     }
 
@@ -156,10 +157,7 @@ export class BrowserManager {
       args.push('--no-sandbox', '--disable-dev-shm-usage');
     }
 
-    logger.info(
-      { chromePath, port, headless: opts.headless ?? false },
-      'Launching Chrome'
-    );
+    logger.info({ chromePath, port, headless }, 'Launching Chrome');
 
     this.chromeProcess = spawn(chromePath, args, {
       stdio: 'ignore',
@@ -178,6 +176,8 @@ export class BrowserManager {
 
     await this.waitForChromeReady(port);
     await this.connect();
+
+    return { headless };
   }
 
   private async waitForChromeReady(
