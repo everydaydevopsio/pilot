@@ -25,7 +25,7 @@ export interface ViewportConfig {
 const MOBILE_USER_AGENT =
   'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36';
 
-export const VIEWPORT_PRESETS: Record<string, ViewportConfig> = {
+export const VIEWPORT_PRESETS = {
   desktop: { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false },
   'desktop-small': {
     width: 1366,
@@ -68,7 +68,7 @@ export const VIEWPORT_PRESETS: Record<string, ViewportConfig> = {
     mobile: true,
     userAgent: MOBILE_USER_AGENT
   }
-};
+} satisfies Record<string, ViewportConfig>;
 
 export type ViewportPresetName = keyof typeof VIEWPORT_PRESETS;
 
@@ -83,7 +83,8 @@ export function resolveViewport(
   opts: ResolveViewportOptions = {}
 ): ViewportConfig {
   const presetName = opts.preset ?? 'desktop';
-  const base = VIEWPORT_PRESETS[presetName];
+  const presets = VIEWPORT_PRESETS as Record<string, ViewportConfig>;
+  const base = presets[presetName];
   if (!base) {
     const valid = Object.keys(VIEWPORT_PRESETS).join(', ');
     throw new Error(
