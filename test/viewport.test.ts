@@ -129,7 +129,14 @@ function makeMockEmulationClient(): {
     setTouchEmulationEnabled: jest.fn().mockResolvedValue(undefined),
     setUserAgentOverride: jest.fn().mockResolvedValue(undefined)
   };
-  const client = { Emulation: emulation } as unknown as Client;
+  const browser = {
+    getWindowForTarget: jest.fn().mockResolvedValue({ windowId: 1 }),
+    setWindowBounds: jest.fn().mockResolvedValue(undefined)
+  };
+  const client = {
+    Emulation: emulation,
+    Browser: browser
+  } as unknown as Client;
   return { client, emulation };
 }
 

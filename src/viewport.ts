@@ -14,6 +14,16 @@ interface EmulationDomain {
   setUserAgentOverride(params: { userAgent: string }): Promise<void>;
 }
 
+interface BrowserDomain {
+  getWindowForTarget(params?: {
+    targetId?: string;
+  }): Promise<{ windowId: number }>;
+  setWindowBounds(params: {
+    windowId: number;
+    bounds: { width?: number; height?: number };
+  }): Promise<void>;
+}
+
 export interface ViewportConfig {
   width: number;
   height: number;
@@ -107,6 +117,21 @@ export async function applyViewport(
   config: ViewportConfig
 ): Promise<void> {
   const emulation = client.Emulation as unknown as EmulationDomain;
+  const browser = client.Browser as unknown as BrowserDomain;
+
+  // Resize the actual browser window so it matches the viewport dimensions.
+  // This is needed because --window-size is unreliable (Chrome may restore
+  // a previous size from the profile) and setDeviceMetricsOverride only
+  // overrides the rendering viewport, not the window itself.
+  try {
+    const { windowId } = await browser.getWindowForTarget();
+    await browser.setWindowBounds({
+      windowId,
+      bounds: { width: config.width, height: config.height }
+    });
+  } catch {
+    // Best-effort: headless Chrome or older versions may not support this.
+  }
 
   await emulation.setDeviceMetricsOverride({
     width: config.width,
