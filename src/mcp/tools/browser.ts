@@ -16,6 +16,7 @@ import {
   executeCloseTab,
   executeSwitchTab
 } from '../../commands/tabs.js';
+import { VIEWPORT_PRESETS } from '../../viewport.js';
 
 // Raw shapes for MCP SDK (expects ZodRawShape, not ZodObject)
 
@@ -136,7 +137,7 @@ const startShape = {
       'Browser profile name. Data is stored under $XDG_DATA_HOME/aab/<profileName>/ (default: ~/.local/share/aab/<profileName>/). Defaults to AAB_PROFILE_NAME env var or "profile1".'
     ),
   viewport: z
-    .string()
+    .enum(Object.keys(VIEWPORT_PRESETS) as [string, ...string[]])
     .optional()
     .describe(
       'Viewport preset: desktop (1920x1080), desktop-small (1366x768), tablet (768x1024), tablet-landscape (1024x768), mobile (390x844), mobile-landscape (844x390), mobile-small (360x800). Defaults to AAB_VIEWPORT env var or "desktop".'
