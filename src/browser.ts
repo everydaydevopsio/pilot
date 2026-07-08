@@ -288,8 +288,8 @@ export class BrowserManager {
     this.launchedCdpPort = port;
     this.launchedUserDataDir = userDataDir;
 
-    this.chromeProcess.on('exit', (code) => {
-      logger.warn({ code }, 'Chrome process exited');
+    this.chromeProcess.on('exit', (code, signal) => {
+      logger.warn({ code, signal }, 'Chrome process exited');
       this.chromeProcess = null;
       this.launchedCdpPort = null;
       this.cleanupUserDataDir();
