@@ -299,8 +299,18 @@ export class BrowserManager {
 
     this.chromeProcess.on('exit', (code, signal) => {
       const stderr = stderrChunks.join('').trim();
+      const stderrFiltered = stderr
+        .split('\n')
+        .filter((l) => !l.includes('dbus/bus.cc'))
+        .join('\n')
+        .trim();
       logger.warn(
-        { code, signal, ...(stderr && { stderr: stderr.slice(0, 500) }) },
+        {
+          code,
+          signal,
+          ...(stderrFiltered && { stderr: stderrFiltered.slice(0, 1000) }),
+          ...(stderr && !stderrFiltered && { stderrRaw: stderr.slice(0, 500) })
+        },
         'Chrome process exited'
       );
       this.chromeProcess = null;
