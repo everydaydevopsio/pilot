@@ -3,7 +3,6 @@ FROM node:24-bookworm
 # chromium plus runtime deps that headless Chrome needs in containers
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
-    dbus \
     libnss3 \
     libatk1.0-0 \
     libatk-bridge2.0-0 \
@@ -16,6 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpangocairo-1.0-0 \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
+
+# Prevent Chrome from trying to connect to a non-existent dbus socket
+ENV DBUS_SESSION_BUS_ADDRESS=/dev/null
 
 WORKDIR /app
 
