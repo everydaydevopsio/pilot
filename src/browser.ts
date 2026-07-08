@@ -257,7 +257,7 @@ export class BrowserManager {
     }
 
     if (process.platform === 'linux') {
-      args.push('--disable-dev-shm-usage');
+      args.push('--disable-dev-shm-usage', '--disable-software-rasterizer');
     }
 
     const sandbox = sandboxDecision();
