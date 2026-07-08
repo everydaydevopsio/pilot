@@ -9,6 +9,7 @@ describe('loadConfig', () => {
     delete process.env.AAB_CDP_MAX_RETRY_MS;
     delete process.env.AAB_PROFILE_NAME;
     delete process.env.AAB_HEADLESS;
+    delete process.env.AAB_VIEWPORT;
   });
 
   it('returns defaults when no args or env vars', () => {
@@ -81,5 +82,22 @@ describe('loadConfig', () => {
     process.env.AAB_HEADLESS = 'true';
     const config = loadConfig();
     expect(config.headless).toBe(true);
+  });
+
+  it('viewport defaults to desktop when AAB_VIEWPORT is unset', () => {
+    const config = loadConfig();
+    expect(config.viewport).toBe('desktop');
+  });
+
+  it('reads AAB_VIEWPORT from env', () => {
+    process.env.AAB_VIEWPORT = 'mobile';
+    const config = loadConfig();
+    expect(config.viewport).toBe('mobile');
+  });
+
+  it('CLI arg viewport overrides env', () => {
+    process.env.AAB_VIEWPORT = 'tablet';
+    const config = loadConfig({ viewport: 'mobile' });
+    expect(config.viewport).toBe('mobile');
   });
 });

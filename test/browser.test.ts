@@ -36,6 +36,11 @@ function makeMockClient() {
     },
     Target: {
       activateTarget: jest.fn().mockResolvedValue(undefined)
+    },
+    Emulation: {
+      setDeviceMetricsOverride: jest.fn().mockResolvedValue(undefined),
+      setTouchEmulationEnabled: jest.fn().mockResolvedValue(undefined),
+      setUserAgentOverride: jest.fn().mockResolvedValue(undefined)
     }
   };
 }
@@ -97,6 +102,11 @@ describe('BrowserManager', () => {
         responseReceived: jest.fn(),
         loadingFailed: jest.fn(),
         loadingFinished: jest.fn()
+      },
+      Emulation: {
+        setDeviceMetricsOverride: jest.fn().mockResolvedValue(undefined),
+        setTouchEmulationEnabled: jest.fn().mockResolvedValue(undefined),
+        setUserAgentOverride: jest.fn().mockResolvedValue(undefined)
       },
       close: jest.fn().mockResolvedValue(undefined)
     };
