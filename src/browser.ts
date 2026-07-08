@@ -40,8 +40,7 @@ export interface LaunchOptions {
 }
 
 export type SandboxDecision =
-  | { disable: false }
-  | { disable: true; reason: 'env_override' | 'root_user' };
+  { disable: false } | { disable: true; reason: 'env_override' | 'root_user' };
 
 export function sandboxDecision(): SandboxDecision {
   const envOverride = process.env.AAB_CHROME_NO_SANDBOX;
