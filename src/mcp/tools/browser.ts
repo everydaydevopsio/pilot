@@ -16,6 +16,7 @@ import {
   executeCloseTab,
   executeSwitchTab
 } from '../../commands/tabs.js';
+import { VIEWPORT_PRESETS } from '../../viewport.js';
 
 // Raw shapes for MCP SDK (expects ZodRawShape, not ZodObject)
 
@@ -134,7 +135,30 @@ const startShape = {
     .optional()
     .describe(
       'Browser profile name. Data is stored under $XDG_DATA_HOME/aab/<profileName>/ (default: ~/.local/share/aab/<profileName>/). Defaults to AAB_PROFILE_NAME env var or "profile1".'
-    )
+    ),
+  viewport: z
+    .enum(Object.keys(VIEWPORT_PRESETS) as [string, ...string[]])
+    .optional()
+    .describe(
+      'Viewport preset: desktop (1920x1080), desktop-small (1366x768), tablet (768x1024), tablet-landscape (1024x768), mobile (390x844), mobile-landscape (844x390), mobile-small (360x800). Defaults to AAB_VIEWPORT env var or "desktop".'
+    ),
+  viewportWidth: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Custom viewport width in pixels. Overrides the preset width.'),
+  viewportHeight: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Custom viewport height in pixels. Overrides the preset height.'),
+  deviceScaleFactor: z
+    .number()
+    .positive()
+    .optional()
+    .describe('Custom device scale factor (DPR). Overrides the preset value.')
 };
 
 const newTabShape = {
@@ -173,7 +197,15 @@ export function registerBrowserTools(
     'browser_start',
     'Launch the Chrome browser. Call this before using any other browser tools.',
     startShape,
-    async ({ headless, chromePath, profileName }) => {
+    async ({
+      headless,
+      chromePath,
+      profileName,
+      viewport,
+      viewportWidth,
+      viewportHeight,
+      deviceScaleFactor
+    }) => {
       if (context.manager?.isConnected()) {
         return {
           content: [
@@ -191,18 +223,23 @@ export function registerBrowserTools(
       }
 
       const manager = makeBrowserManager();
-      const { headless: effectiveHeadless } = await manager.launch({
-        headless,
-        chromePath,
-        profileName
-      });
+      const { headless: effectiveHeadless, viewport: effectiveViewport } =
+        await manager.launch({
+          headless,
+          chromePath,
+          profileName,
+          viewport,
+          viewportWidth,
+          viewportHeight,
+          deviceScaleFactor
+        });
       context.manager = manager;
 
       return {
         content: [
           {
             type: 'text' as const,
-            text: `Browser started${effectiveHeadless ? ' (headless)' : ' (visible)'}.`
+            text: `Browser started${effectiveHeadless ? ' (headless)' : ' (visible)'}, viewport: ${effectiveViewport}.`
           }
         ]
       };

@@ -17,6 +17,7 @@ export default {
       }
     ]
   },
+  maxWorkers: 1,
   testTimeout: 60000,
   globalSetup: '<rootDir>/e2e/mcp/setup.ts',
   globalTeardown: '<rootDir>/e2e/mcp/teardown.ts'

@@ -7,6 +7,11 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { getLogger } from './util/logger.js';
 import type { Config } from './util/config.js';
+import {
+  type ViewportConfig,
+  resolveViewport,
+  applyViewport
+} from './viewport.js';
 
 export type BrowserEventCallback = (event: string, data: unknown) => void;
 
@@ -28,6 +33,10 @@ export interface LaunchOptions {
   headless?: boolean;
   chromePath?: string;
   profileName?: string;
+  viewport?: string;
+  viewportWidth?: number;
+  viewportHeight?: number;
+  deviceScaleFactor?: number;
 }
 
 export type SandboxDecision =
@@ -115,6 +124,7 @@ export class BrowserManager {
   private networkIdleResolvers: Array<() => void> = [];
   private chromeProcess: ChildProcess | null = null;
   private launchedCdpPort: number | null = null;
+  private viewportConfig: ViewportConfig | null = null;
   private launchedUserDataDir: string | null = null;
 
   constructor(private readonly config: Config) {
@@ -196,7 +206,9 @@ export class BrowserManager {
     });
   }
 
-  async launch(opts: LaunchOptions = {}): Promise<{ headless: boolean }> {
+  async launch(
+    opts: LaunchOptions = {}
+  ): Promise<{ headless: boolean; viewport: string }> {
     if (this.chromeProcess) {
       throw new Error('Chrome is already launched');
     }
@@ -221,9 +233,18 @@ export class BrowserManager {
 
     mkdirSync(userDataDir, { recursive: true });
 
+    const viewportPreset = opts.viewport ?? this.config.viewport;
+    this.viewportConfig = resolveViewport({
+      preset: viewportPreset,
+      width: opts.viewportWidth,
+      height: opts.viewportHeight,
+      deviceScaleFactor: opts.deviceScaleFactor
+    });
+
     const args = [
       `--remote-debugging-port=${port}`,
       `--user-data-dir=${userDataDir}`,
+      `--window-size=${this.viewportConfig.width},${this.viewportConfig.height}`,
       '--no-first-run',
       '--no-default-browser-check',
       '--disable-default-apps',
@@ -232,11 +253,17 @@ export class BrowserManager {
 
     const headless = opts.headless ?? this.config.headless;
     if (headless) {
-      args.push('--headless=new', '--disable-gpu');
+      args.push('--headless', '--disable-gpu');
     }
 
     if (process.platform === 'linux') {
-      args.push('--disable-dev-shm-usage');
+      args.push(
+        '--disable-dev-shm-usage',
+        '--disable-software-rasterizer',
+        '--disable-breakpad',
+        '--password-store=basic',
+        '--use-mock-keychain'
+      );
     }
 
     const sandbox = sandboxDecision();
@@ -253,21 +280,41 @@ export class BrowserManager {
         chromePath,
         port,
         headless,
+        viewport: viewportPreset,
         sandbox: sandbox.disable ? 'disabled' : 'enabled'
       },
       'Launching Chrome'
     );
 
     this.chromeProcess = spawn(chromePath, args, {
-      stdio: 'ignore',
+      stdio: ['ignore', 'ignore', 'pipe'],
       detached: false
     });
 
     this.launchedCdpPort = port;
     this.launchedUserDataDir = userDataDir;
 
-    this.chromeProcess.on('exit', (code) => {
-      logger.warn({ code }, 'Chrome process exited');
+    const stderrChunks: string[] = [];
+    this.chromeProcess.stderr?.on('data', (data: Buffer) => {
+      stderrChunks.push(data.toString());
+    });
+
+    this.chromeProcess.on('exit', (code, signal) => {
+      const stderr = stderrChunks.join('').trim();
+      const stderrFiltered = stderr
+        .split('\n')
+        .filter((l) => !l.includes('dbus/bus.cc'))
+        .join('\n')
+        .trim();
+      logger.warn(
+        {
+          code,
+          signal,
+          ...(stderrFiltered && { stderr: stderrFiltered.slice(0, 1000) }),
+          ...(stderr && !stderrFiltered && { stderrRaw: stderr.slice(0, 500) })
+        },
+        'Chrome process exited'
+      );
       this.chromeProcess = null;
       this.launchedCdpPort = null;
       this.cleanupUserDataDir();
@@ -276,7 +323,7 @@ export class BrowserManager {
     await this.waitForChromeReady(port);
     await this.connect();
 
-    return { headless };
+    return { headless, viewport: viewportPreset };
   }
 
   private async waitForChromeReady(
@@ -352,6 +399,10 @@ export class BrowserManager {
       client.Page.enable(),
       client.Runtime.enable()
     ]);
+
+    if (this.viewportConfig) {
+      await applyViewport(client, this.viewportConfig);
+    }
   }
 
   private attachEventListeners(client: Client): void {

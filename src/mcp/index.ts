@@ -54,6 +54,13 @@ async function run(): Promise<void> {
       '  AAB_PROFILE_NAME      Browser profile name (default: profile1)'
     );
     console.log('  AAB_CHROME_NO_SANDBOX Override Chrome sandbox (true/false)');
+    console.log('  AAB_VIEWPORT          Viewport preset (default: desktop)');
+    console.log(
+      '                        Presets: desktop, desktop-small, tablet,'
+    );
+    console.log(
+      '                        tablet-landscape, mobile, mobile-landscape, mobile-small'
+    );
     return;
   }
 
