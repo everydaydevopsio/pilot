@@ -253,14 +253,16 @@ export class BrowserManager {
 
     const headless = opts.headless ?? this.config.headless;
     if (headless) {
-      args.push('--headless=new', '--disable-gpu');
+      args.push('--headless', '--disable-gpu');
     }
 
     if (process.platform === 'linux') {
       args.push(
         '--disable-dev-shm-usage',
         '--disable-software-rasterizer',
-        '--disable-breakpad'
+        '--disable-breakpad',
+        '--password-store=basic',
+        '--use-mock-keychain'
       );
     }
 
