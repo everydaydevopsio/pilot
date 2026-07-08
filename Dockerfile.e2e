@@ -1,24 +1,17 @@
 FROM node:24-bookworm
 
-# chromium plus runtime deps that headless Chrome needs in containers
+# Install Google Chrome Stable (release build, no DCHECKs) instead of
+# Debian's chromium package which can crash with SIGTRAP in containers.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium \
-    dbus \
-    libnss3 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libxdamage1 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
+    wget gnupg ca-certificates \
+    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub \
+       | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+       > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    google-chrome-stable \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
-
-# Start dbus before running tests — Chrome requires a system bus
-RUN mkdir -p /run/dbus
 
 WORKDIR /app
 
