@@ -1,7 +1,20 @@
 FROM node:24-bookworm
 
-# chromium is available for both amd64 and arm64 in Debian Bookworm
-RUN apt-get update && apt-get install -y chromium \
+# chromium plus runtime deps that headless Chrome needs in containers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    dbus \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

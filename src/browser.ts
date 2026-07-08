@@ -257,7 +257,11 @@ export class BrowserManager {
     }
 
     if (process.platform === 'linux') {
-      args.push('--disable-dev-shm-usage', '--disable-software-rasterizer');
+      args.push(
+        '--disable-dev-shm-usage',
+        '--disable-software-rasterizer',
+        '--disable-breakpad'
+      );
     }
 
     const sandbox = sandboxDecision();
@@ -281,15 +285,24 @@ export class BrowserManager {
     );
 
     this.chromeProcess = spawn(chromePath, args, {
-      stdio: 'ignore',
+      stdio: ['ignore', 'ignore', 'pipe'],
       detached: false
     });
 
     this.launchedCdpPort = port;
     this.launchedUserDataDir = userDataDir;
 
+    const stderrChunks: string[] = [];
+    this.chromeProcess.stderr?.on('data', (data: Buffer) => {
+      stderrChunks.push(data.toString());
+    });
+
     this.chromeProcess.on('exit', (code, signal) => {
-      logger.warn({ code, signal }, 'Chrome process exited');
+      const stderr = stderrChunks.join('').trim();
+      logger.warn(
+        { code, signal, ...(stderr && { stderr: stderr.slice(0, 500) }) },
+        'Chrome process exited'
+      );
       this.chromeProcess = null;
       this.launchedCdpPort = null;
       this.cleanupUserDataDir();
