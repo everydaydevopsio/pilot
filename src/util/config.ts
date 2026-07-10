@@ -11,7 +11,8 @@ const ConfigSchema = z.object({
   chromePath: z.string().optional(),
   headless: z.boolean().default(true),
   profileName: z.string().default('profile1'),
-  viewport: z.string().default('desktop')
+  viewport: z.string().default('desktop'),
+  responsive: z.boolean().optional()
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -24,6 +25,7 @@ export interface CliArgs {
   headless?: boolean;
   profileName?: string;
   viewport?: string;
+  responsive?: boolean;
 }
 
 export function loadConfig(cliArgs: CliArgs = {}): Config {
@@ -45,7 +47,11 @@ export function loadConfig(cliArgs: CliArgs = {}): Config {
         ? process.env.AAB_HEADLESS !== 'false'
         : undefined,
     profileName: process.env.AAB_PROFILE_NAME,
-    viewport: process.env.AAB_VIEWPORT
+    viewport: process.env.AAB_VIEWPORT,
+    responsive:
+      process.env.AAB_RESPONSIVE !== undefined
+        ? process.env.AAB_RESPONSIVE !== 'false'
+        : undefined
   };
 
   const merged = {
@@ -57,7 +63,8 @@ export function loadConfig(cliArgs: CliArgs = {}): Config {
     chromePath: cliArgs.chromePath ?? env.chromePath,
     headless: cliArgs.headless ?? env.headless,
     profileName: cliArgs.profileName ?? env.profileName,
-    viewport: cliArgs.viewport ?? env.viewport
+    viewport: cliArgs.viewport ?? env.viewport,
+    responsive: cliArgs.responsive ?? env.responsive
   };
 
   return ConfigSchema.parse(merged);

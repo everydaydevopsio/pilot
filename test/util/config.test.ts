@@ -10,6 +10,7 @@ describe('loadConfig', () => {
     delete process.env.AAB_PROFILE_NAME;
     delete process.env.AAB_HEADLESS;
     delete process.env.AAB_VIEWPORT;
+    delete process.env.AAB_RESPONSIVE;
   });
 
   it('returns defaults when no args or env vars', () => {
@@ -99,5 +100,28 @@ describe('loadConfig', () => {
     process.env.AAB_VIEWPORT = 'tablet';
     const config = loadConfig({ viewport: 'mobile' });
     expect(config.viewport).toBe('mobile');
+  });
+
+  it('responsive is undefined by default', () => {
+    const config = loadConfig();
+    expect(config.responsive).toBeUndefined();
+  });
+
+  it('AAB_RESPONSIVE=true sets responsive to true', () => {
+    process.env.AAB_RESPONSIVE = 'true';
+    const config = loadConfig();
+    expect(config.responsive).toBe(true);
+  });
+
+  it('AAB_RESPONSIVE=false sets responsive to false', () => {
+    process.env.AAB_RESPONSIVE = 'false';
+    const config = loadConfig();
+    expect(config.responsive).toBe(false);
+  });
+
+  it('CLI arg responsive overrides env', () => {
+    process.env.AAB_RESPONSIVE = 'true';
+    const config = loadConfig({ responsive: false });
+    expect(config.responsive).toBe(false);
   });
 });

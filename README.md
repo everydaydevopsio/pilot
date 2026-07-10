@@ -98,15 +98,16 @@ Or add to `.mcp.json` in your project:
 
 **Browser Control:**
 
-| Tool                 | Description                                     |
-| -------------------- | ----------------------------------------------- |
-| `browser_screenshot` | Capture viewport or full page screenshot        |
-| `browser_navigate`   | Navigate to URL and wait for load               |
-| `browser_click`      | Click element by CSS selector or coordinates    |
-| `browser_type`       | Type text into focused element or selector      |
-| `browser_evaluate`   | Execute JavaScript and return result            |
-| `browser_wait`       | Wait for selector, network idle, or fixed delay |
-| `browser_page_info`  | Get current URL, title, and ready state         |
+| Tool                      | Description                                      |
+| ------------------------- | ------------------------------------------------ |
+| `browser_screenshot`      | Capture viewport or full page screenshot         |
+| `browser_navigate`        | Navigate to URL and wait for load                |
+| `browser_click`           | Click element by CSS selector or coordinates     |
+| `browser_type`            | Type text into focused element or selector       |
+| `browser_evaluate`        | Execute JavaScript and return result             |
+| `browser_wait`            | Wait for selector, network idle, or fixed delay  |
+| `browser_page_info`       | Get current URL, title, and ready state          |
+| `browser_viewport_resize` | Resize the viewport to new dimensions at runtime |
 
 **Error Monitoring:**
 
@@ -120,18 +121,37 @@ Or add to `.mcp.json` in your project:
 
 All configuration via environment variables.
 
-| Env var                 | Default     | Description                                                                                                                                                                           |
-| ----------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AAB_CDP_PORT`          | `9222`      | CDP port when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                         |
-| `AAB_CDP_HOST`          | `127.0.0.1` | CDP host when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                         |
-| `AAB_LOG_LEVEL`         | `info`      | Pino log level                                                                                                                                                                        |
-| `AAB_CHROME_PATH`       | (auto)      | Path to Chrome executable                                                                                                                                                             |
-| `AAB_HEADLESS`          | `true`      | Run Chrome headless                                                                                                                                                                   |
-| `AAB_MCP_BUFFER_SIZE`   | `1000`      | Console message buffer size                                                                                                                                                           |
-| `AAB_PROFILE_NAME`      | `profile1`  | Persistent browser profile name. Profiles are stored under `$XDG_DATA_HOME/aab/<name>` (default `~/.local/share/aab/<name>`).                                                         |
-| `AAB_CHROME_NO_SANDBOX` | (auto)      | Force `--no-sandbox` on/off. Accepts `true`/`1` or `false`/`0`. When unset, the flag is auto-applied only when running as root on Linux. See [Chrome sandbox](#chrome-sandbox) below. |
+| Env var                 | Default     | Description                                                                                                                                                                                                                                                          |
+| ----------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AAB_CDP_PORT`          | `9222`      | CDP port when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                                                                                                        |
+| `AAB_CDP_HOST`          | `127.0.0.1` | CDP host when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                                                                                                        |
+| `AAB_LOG_LEVEL`         | `info`      | Pino log level                                                                                                                                                                                                                                                       |
+| `AAB_CHROME_PATH`       | (auto)      | Path to Chrome executable                                                                                                                                                                                                                                            |
+| `AAB_HEADLESS`          | `true`      | Run Chrome headless                                                                                                                                                                                                                                                  |
+| `AAB_MCP_BUFFER_SIZE`   | `1000`      | Console message buffer size                                                                                                                                                                                                                                          |
+| `AAB_PROFILE_NAME`      | `profile1`  | Persistent browser profile name. Profiles are stored under `$XDG_DATA_HOME/aab/<name>` (default `~/.local/share/aab/<name>`).                                                                                                                                        |
+| `AAB_RESPONSIVE`        | (preset)    | Responsive viewport mode. When `true`, the page uses real window dimensions and reflows on resize. Desktop presets default to `true`; mobile/tablet presets leave this unset (locked viewport). Set to `false` to lock the viewport with `setDeviceMetricsOverride`. |
+| `AAB_CHROME_NO_SANDBOX` | (auto)      | Force `--no-sandbox` on/off. Accepts `true`/`1` or `false`/`0`. When unset, the flag is auto-applied only when running as root on Linux. See [Chrome sandbox](#chrome-sandbox) below.                                                                                |
 
 > **Tip — seeing the browser window:** By default Chrome runs headless (no visible window). To watch the browser while the agent works, ask the AI agent: _"set headless to false"_ (or _"run Chrome with a visible window"_). The agent will set `AAB_HEADLESS=false` before calling `browser_start`, and a Chrome window will appear on your desktop.
+
+### Responsive viewport mode
+
+Desktop presets (`desktop`, `desktop-small`) default to **responsive mode**. In responsive mode, the page uses the real browser window dimensions and reflows naturally when the window is resized — just like a normal browser. This is useful for testing responsive websites where you want the layout to react to window changes.
+
+Mobile and tablet presets use a **locked viewport** (via `setDeviceMetricsOverride`) to emulate exact device dimensions regardless of the actual window size.
+
+To lock the viewport on desktop (the old behavior), set `responsive: false` in `browser_start` or `AAB_RESPONSIVE=false`.
+
+#### Resizing at runtime
+
+Use `browser_viewport_resize` to change the viewport dimensions while the browser is running:
+
+```
+browser_viewport_resize({ width: 1024, height: 768 })
+```
+
+This sets both the window size and the rendering viewport, and disables responsive mode so the page stays locked at the specified dimensions. Useful for testing specific breakpoints or device sizes without restarting the browser.
 
 ### Chrome sandbox
 
