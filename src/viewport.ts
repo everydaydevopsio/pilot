@@ -30,18 +30,26 @@ export interface ViewportConfig {
   deviceScaleFactor: number;
   mobile: boolean;
   userAgent?: string;
+  responsive?: boolean;
 }
 
 const MOBILE_USER_AGENT =
   'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36';
 
 export const VIEWPORT_PRESETS = {
-  desktop: { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false },
+  desktop: {
+    width: 1920,
+    height: 1080,
+    deviceScaleFactor: 1,
+    mobile: false,
+    responsive: true
+  },
   'desktop-small': {
     width: 1366,
     height: 768,
     deviceScaleFactor: 1,
-    mobile: false
+    mobile: false,
+    responsive: true
   },
   tablet: {
     width: 768,
@@ -87,6 +95,7 @@ export interface ResolveViewportOptions {
   width?: number;
   height?: number;
   deviceScaleFactor?: number;
+  responsive?: boolean;
 }
 
 export function resolveViewport(
@@ -108,7 +117,8 @@ export function resolveViewport(
     ...(opts.height !== undefined && { height: opts.height }),
     ...(opts.deviceScaleFactor !== undefined && {
       deviceScaleFactor: opts.deviceScaleFactor
-    })
+    }),
+    ...(opts.responsive !== undefined && { responsive: opts.responsive })
   };
 }
 
@@ -133,12 +143,17 @@ export async function applyViewport(
     // Best-effort: headless Chrome or older versions may not support this.
   }
 
-  await emulation.setDeviceMetricsOverride({
-    width: config.width,
-    height: config.height,
-    deviceScaleFactor: config.deviceScaleFactor,
-    mobile: config.mobile
-  });
+  // In responsive mode, skip setDeviceMetricsOverride so the page uses the
+  // real window dimensions and reflows naturally when the window is resized
+  // — just like a normal browser. This is the default for desktop presets.
+  if (!config.responsive) {
+    await emulation.setDeviceMetricsOverride({
+      width: config.width,
+      height: config.height,
+      deviceScaleFactor: config.deviceScaleFactor,
+      mobile: config.mobile
+    });
+  }
 
   if (config.mobile) {
     await emulation.setTouchEmulationEnabled({

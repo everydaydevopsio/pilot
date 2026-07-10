@@ -18,6 +18,7 @@ describe('resolveViewport', () => {
     expect(config.deviceScaleFactor).toBe(1);
     expect(config.mobile).toBe(false);
     expect(config.userAgent).toBeUndefined();
+    expect(config.responsive).toBe(true);
   });
 
   it('returns desktop-small preset', () => {
@@ -25,6 +26,7 @@ describe('resolveViewport', () => {
     expect(config.width).toBe(1366);
     expect(config.height).toBe(768);
     expect(config.mobile).toBe(false);
+    expect(config.responsive).toBe(true);
   });
 
   it('returns tablet preset with mobile flags', () => {
@@ -112,6 +114,28 @@ describe('resolveViewport', () => {
     expect(config.deviceScaleFactor).toBe(2);
     expect(config.mobile).toBe(true);
   });
+
+  it('desktop presets default responsive to true', () => {
+    expect(resolveViewport({ preset: 'desktop' }).responsive).toBe(true);
+    expect(resolveViewport({ preset: 'desktop-small' }).responsive).toBe(true);
+  });
+
+  it('mobile/tablet presets default responsive to undefined', () => {
+    expect(resolveViewport({ preset: 'mobile' }).responsive).toBeUndefined();
+    expect(resolveViewport({ preset: 'tablet' }).responsive).toBeUndefined();
+  });
+
+  it('responsive override to false on desktop preset', () => {
+    const config = resolveViewport({ preset: 'desktop', responsive: false });
+    expect(config.responsive).toBe(false);
+    expect(config.width).toBe(1920);
+  });
+
+  it('responsive override to true on mobile preset', () => {
+    const config = resolveViewport({ preset: 'mobile', responsive: true });
+    expect(config.responsive).toBe(true);
+    expect(config.mobile).toBe(true);
+  });
 });
 
 interface MockEmulation {
@@ -141,18 +165,15 @@ function makeMockEmulationClient(): {
 }
 
 describe('applyViewport', () => {
-  it('calls setDeviceMetricsOverride for desktop', async () => {
+  it('skips setDeviceMetricsOverride for desktop (responsive by default)', async () => {
     const { client, emulation } = makeMockEmulationClient();
     const config = resolveViewport({ preset: 'desktop' });
 
     await applyViewport(client, config);
 
-    expect(emulation.setDeviceMetricsOverride).toHaveBeenCalledWith({
-      width: 1920,
-      height: 1080,
-      deviceScaleFactor: 1,
-      mobile: false
-    });
+    // Desktop presets default to responsive mode, so setDeviceMetricsOverride
+    // is not called — the page uses real window dimensions instead.
+    expect(emulation.setDeviceMetricsOverride).not.toHaveBeenCalled();
   });
 
   it('does not call touch or user-agent override for desktop', async () => {
@@ -214,6 +235,46 @@ describe('applyViewport', () => {
       height: 844,
       deviceScaleFactor: 3,
       mobile: true
+    });
+  });
+
+  it('skips setDeviceMetricsOverride when responsive is true', async () => {
+    const { client, emulation } = makeMockEmulationClient();
+    const config = resolveViewport({ preset: 'desktop' });
+    // desktop defaults to responsive: true
+    expect(config.responsive).toBe(true);
+
+    await applyViewport(client, config);
+
+    expect(emulation.setDeviceMetricsOverride).not.toHaveBeenCalled();
+  });
+
+  it('calls setDeviceMetricsOverride when responsive is explicitly false on desktop', async () => {
+    const { client, emulation } = makeMockEmulationClient();
+    const config = resolveViewport({ preset: 'desktop', responsive: false });
+
+    await applyViewport(client, config);
+
+    expect(emulation.setDeviceMetricsOverride).toHaveBeenCalledWith({
+      width: 1920,
+      height: 1080,
+      deviceScaleFactor: 1,
+      mobile: false
+    });
+  });
+
+  it('still sets window bounds in responsive mode', async () => {
+    const { client } = makeMockEmulationClient();
+    const browser = (
+      client as unknown as { Browser: { setWindowBounds: jest.Mock } }
+    ).Browser;
+    const config = resolveViewport({ preset: 'desktop' });
+
+    await applyViewport(client, config);
+
+    expect(browser.setWindowBounds).toHaveBeenCalledWith({
+      windowId: 1,
+      bounds: { width: 1920, height: 1080 }
     });
   });
 });

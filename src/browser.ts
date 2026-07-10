@@ -37,6 +37,7 @@ export interface LaunchOptions {
   viewportWidth?: number;
   viewportHeight?: number;
   deviceScaleFactor?: number;
+  responsive?: boolean;
 }
 
 export type SandboxDecision =
@@ -159,6 +160,14 @@ export class BrowserManager {
     return this.chromeProcess !== null;
   }
 
+  getViewportConfig(): ViewportConfig | null {
+    return this.viewportConfig;
+  }
+
+  setViewportConfig(config: ViewportConfig): void {
+    this.viewportConfig = config;
+  }
+
   static findChromeExecutable(override?: string): string {
     if (override) return override;
     const env = process.env.AAB_CHROME_PATH;
@@ -237,7 +246,8 @@ export class BrowserManager {
       preset: viewportPreset,
       width: opts.viewportWidth,
       height: opts.viewportHeight,
-      deviceScaleFactor: opts.deviceScaleFactor
+      deviceScaleFactor: opts.deviceScaleFactor,
+      responsive: opts.responsive ?? this.config.responsive
     });
 
     const args = [

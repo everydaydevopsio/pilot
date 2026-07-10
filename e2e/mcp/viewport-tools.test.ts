@@ -59,10 +59,15 @@ describe('MCP E2E: viewport default (desktop)', () => {
     });
   });
 
-  it('has desktop dimensions (1920x1080)', async () => {
+  it('has desktop width (responsive mode, window may have chrome)', async () => {
     const size = await getViewportSize(mcp);
+    // In responsive mode (the default for desktop), setDeviceMetricsOverride
+    // is skipped and the page uses real window dimensions. The width should
+    // match the window-size flag, but the height may be reduced by browser
+    // chrome (title bar, etc.) even in headless mode.
     expect(size.width).toBe(1920);
-    expect(size.height).toBe(1080);
+    expect(size.height).toBeGreaterThanOrEqual(900);
+    expect(size.height).toBeLessThanOrEqual(1080);
   });
 
   it('has devicePixelRatio of 1', async () => {
@@ -163,7 +168,8 @@ describe('MCP E2E: viewport custom overrides', () => {
       headless: true,
       viewport: 'desktop',
       viewportWidth: 1280,
-      viewportHeight: 720
+      viewportHeight: 720,
+      responsive: false
     });
     await mcp.callTool('browser_navigate', {
       url: VIEWPORT_PAGE,
@@ -180,5 +186,113 @@ describe('MCP E2E: viewport custom overrides', () => {
     const size = await getViewportSize(mcp);
     expect(size.width).toBe(1280);
     expect(size.height).toBe(720);
+  });
+});
+
+// ── Non-responsive desktop (locked viewport) ──────────────────────────────
+
+describe('MCP E2E: viewport desktop non-responsive', () => {
+  let mcp: McpTestClient;
+
+  beforeAll(async () => {
+    mcp = new McpTestClient();
+    await mcp.connect();
+    await mcp.callTool('browser_start', {
+      headless: true,
+      viewport: 'desktop',
+      responsive: false
+    });
+    await mcp.callTool('browser_navigate', {
+      url: VIEWPORT_PAGE,
+      waitUntil: 'load'
+    });
+  }, 30000);
+
+  afterAll(async () => {
+    await mcp.stopBrowser();
+    await mcp.close();
+  });
+
+  it('has locked desktop dimensions (1920x1080)', async () => {
+    const size = await getViewportSize(mcp);
+    expect(size.width).toBe(1920);
+    expect(size.height).toBe(1080);
+  });
+
+  it('has devicePixelRatio of 1', async () => {
+    const dpr = await getDevicePixelRatio(mcp);
+    expect(dpr).toBe(1);
+  });
+});
+
+// ── browser_viewport_resize tool ──────────────────────────────────────────
+
+describe('MCP E2E: browser_viewport_resize', () => {
+  let mcp: McpTestClient;
+
+  beforeAll(async () => {
+    mcp = new McpTestClient();
+    await mcp.connect();
+    await mcp.callTool('browser_start', {
+      headless: true,
+      viewport: 'desktop',
+      responsive: false
+    });
+    await mcp.callTool('browser_navigate', {
+      url: VIEWPORT_PAGE,
+      waitUntil: 'load'
+    });
+  }, 30000);
+
+  afterAll(async () => {
+    await mcp.stopBrowser();
+    await mcp.close();
+  });
+
+  it('resizes viewport to new dimensions', async () => {
+    const result = await mcp.callTool('browser_viewport_resize', {
+      width: 800,
+      height: 600
+    });
+    expect(mcp.getText(result)).toMatch(/800x600/);
+
+    const size = await getViewportSize(mcp);
+    expect(size.width).toBe(800);
+    expect(size.height).toBe(600);
+  });
+
+  it('resizes to a larger viewport', async () => {
+    await mcp.callTool('browser_viewport_resize', {
+      width: 1440,
+      height: 900
+    });
+
+    const size = await getViewportSize(mcp);
+    expect(size.width).toBe(1440);
+    expect(size.height).toBe(900);
+  });
+
+  it('changes deviceScaleFactor', async () => {
+    await mcp.callTool('browser_viewport_resize', {
+      width: 1440,
+      height: 900,
+      deviceScaleFactor: 2
+    });
+
+    const dpr = await getDevicePixelRatio(mcp);
+    expect(dpr).toBe(2);
+  });
+
+  it('requires browser to be started', async () => {
+    const mcp2 = new McpTestClient();
+    await mcp2.connect();
+
+    const result = await mcp2.callTool('browser_viewport_resize', {
+      width: 800,
+      height: 600
+    });
+    expect(mcp2.getText(result)).toMatch(/not started/i);
+
+    await mcp2.close();
   });
 });

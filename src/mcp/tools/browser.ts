@@ -16,7 +16,11 @@ import {
   executeCloseTab,
   executeSwitchTab
 } from '../../commands/tabs.js';
-import { VIEWPORT_PRESETS } from '../../viewport.js';
+import {
+  VIEWPORT_PRESETS,
+  applyViewport,
+  type ViewportConfig
+} from '../../viewport.js';
 
 // Raw shapes for MCP SDK (expects ZodRawShape, not ZodObject)
 
@@ -158,7 +162,13 @@ const startShape = {
     .number()
     .positive()
     .optional()
-    .describe('Custom device scale factor (DPR). Overrides the preset value.')
+    .describe('Custom device scale factor (DPR). Overrides the preset value.'),
+  responsive: z
+    .boolean()
+    .optional()
+    .describe(
+      'Responsive mode. When true, the page uses real window dimensions and reflows on resize (like a normal browser). Desktop presets default to true; mobile/tablet presets default to false. Set to false to lock the viewport with setDeviceMetricsOverride.'
+    )
 };
 
 const newTabShape = {
@@ -174,6 +184,24 @@ const closeTabShape = {
 
 const switchTabShape = {
   targetId: z.string().describe('Target ID of the tab to switch to')
+};
+
+const viewportResizeShape = {
+  width: z.number().int().positive().describe('New viewport width in pixels'),
+  height: z.number().int().positive().describe('New viewport height in pixels'),
+  deviceScaleFactor: z
+    .number()
+    .positive()
+    .optional()
+    .describe(
+      'Device scale factor (DPR). Defaults to the current value if omitted.'
+    ),
+  mobile: z
+    .boolean()
+    .optional()
+    .describe(
+      'Emulate a mobile device. Defaults to the current value if omitted.'
+    )
 };
 
 function requireClient(context: BrowserContext): {
@@ -204,7 +232,8 @@ export function registerBrowserTools(
       viewport,
       viewportWidth,
       viewportHeight,
-      deviceScaleFactor
+      deviceScaleFactor,
+      responsive
     }) => {
       if (context.manager?.isConnected()) {
         return {
@@ -231,7 +260,8 @@ export function registerBrowserTools(
           viewport,
           viewportWidth,
           viewportHeight,
-          deviceScaleFactor
+          deviceScaleFactor,
+          responsive
         });
       context.manager = manager;
 
@@ -530,6 +560,36 @@ export function registerBrowserTools(
           {
             type: 'text' as const,
             text: `Switched to tab ${targetId}.`
+          }
+        ]
+      };
+    }
+  );
+
+  server.tool(
+    'browser_viewport_resize',
+    'Resize the browser viewport to new dimensions. Updates both the window size and the rendering viewport. Disables responsive mode so the viewport stays locked at the specified size.',
+    viewportResizeShape,
+    async ({ width, height, deviceScaleFactor, mobile }) => {
+      const { client, manager } = requireClient(context);
+
+      const current = manager.getViewportConfig();
+      const newConfig: ViewportConfig = {
+        width,
+        height,
+        deviceScaleFactor: deviceScaleFactor ?? current?.deviceScaleFactor ?? 1,
+        mobile: mobile ?? current?.mobile ?? false,
+        responsive: false
+      };
+
+      await applyViewport(client, newConfig);
+      manager.setViewportConfig(newConfig);
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Viewport resized to ${width}x${height} (DPR: ${newConfig.deviceScaleFactor}, mobile: ${newConfig.mobile}).`
           }
         ]
       };
