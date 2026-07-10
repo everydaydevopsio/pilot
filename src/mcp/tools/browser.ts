@@ -162,12 +162,14 @@ const startShape = {
     .number()
     .positive()
     .optional()
-    .describe('Custom device scale factor (DPR). Overrides the preset value.'),
+    .describe(
+      'Custom device scale factor (DPR). Overrides the preset value. Only takes effect in locked (non-responsive) mode.'
+    ),
   responsive: z
     .boolean()
     .optional()
     .describe(
-      'Responsive mode. When true, the page uses real window dimensions and reflows on resize (like a normal browser). Desktop presets default to true; mobile/tablet presets default to false. Set to false to lock the viewport with setDeviceMetricsOverride.'
+      'Responsive mode. When true, the page uses real window dimensions and reflows on resize (like a normal browser). Desktop presets default to true; mobile/tablet presets leave this unset (locked viewport). Set to false to lock the viewport with setDeviceMetricsOverride.'
     )
 };
 
@@ -574,12 +576,15 @@ export function registerBrowserTools(
       const { client, manager } = requireClient(context);
 
       const current = manager.getViewportConfig();
+      const effectiveMobile = mobile ?? current?.mobile ?? false;
       const newConfig: ViewportConfig = {
         width,
         height,
         deviceScaleFactor: deviceScaleFactor ?? current?.deviceScaleFactor ?? 1,
-        mobile: mobile ?? current?.mobile ?? false,
-        responsive: false
+        mobile: effectiveMobile,
+        responsive: false,
+        ...(effectiveMobile &&
+          current?.userAgent && { userAgent: current.userAgent })
       };
 
       await applyViewport(client, newConfig);
