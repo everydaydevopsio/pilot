@@ -69,6 +69,51 @@ describe('resolveViewport', () => {
     expect(config.mobile).toBe(true);
   });
 
+  it('returns desktop-scaled preset', () => {
+    const config = resolveViewport({ preset: 'desktop-scaled' });
+    expect(config.width).toBe(1536);
+    expect(config.height).toBe(864);
+    expect(config.deviceScaleFactor).toBe(1.25);
+    expect(config.mobile).toBe(false);
+    expect(config.responsive).toBe(true);
+  });
+
+  it('returns desktop-qhd preset', () => {
+    const config = resolveViewport({ preset: 'desktop-qhd' });
+    expect(config.width).toBe(2560);
+    expect(config.height).toBe(1440);
+    expect(config.deviceScaleFactor).toBe(1);
+    expect(config.mobile).toBe(false);
+    expect(config.responsive).toBe(true);
+  });
+
+  it('returns mobile-pro preset', () => {
+    const config = resolveViewport({ preset: 'mobile-pro' });
+    expect(config.width).toBe(393);
+    expect(config.height).toBe(852);
+    expect(config.deviceScaleFactor).toBe(3);
+    expect(config.mobile).toBe(true);
+    expect(config.userAgent).toBeDefined();
+  });
+
+  it('returns mobile-large preset', () => {
+    const config = resolveViewport({ preset: 'mobile-large' });
+    expect(config.width).toBe(430);
+    expect(config.height).toBe(932);
+    expect(config.deviceScaleFactor).toBe(3);
+    expect(config.mobile).toBe(true);
+    expect(config.userAgent).toBeDefined();
+  });
+
+  it('returns mobile-android preset', () => {
+    const config = resolveViewport({ preset: 'mobile-android' });
+    expect(config.width).toBe(412);
+    expect(config.height).toBe(915);
+    expect(config.deviceScaleFactor).toBe(2.625);
+    expect(config.mobile).toBe(true);
+    expect(config.userAgent).toBeDefined();
+  });
+
   it('throws on unknown preset name', () => {
     expect(() => resolveViewport({ preset: 'unknown' })).toThrow(
       /Unknown viewport preset "unknown"/
@@ -118,11 +163,22 @@ describe('resolveViewport', () => {
   it('desktop presets default responsive to true', () => {
     expect(resolveViewport({ preset: 'desktop' }).responsive).toBe(true);
     expect(resolveViewport({ preset: 'desktop-small' }).responsive).toBe(true);
+    expect(resolveViewport({ preset: 'desktop-scaled' }).responsive).toBe(true);
+    expect(resolveViewport({ preset: 'desktop-qhd' }).responsive).toBe(true);
   });
 
   it('mobile/tablet presets default responsive to undefined', () => {
     expect(resolveViewport({ preset: 'mobile' }).responsive).toBeUndefined();
     expect(resolveViewport({ preset: 'tablet' }).responsive).toBeUndefined();
+    expect(
+      resolveViewport({ preset: 'mobile-pro' }).responsive
+    ).toBeUndefined();
+    expect(
+      resolveViewport({ preset: 'mobile-large' }).responsive
+    ).toBeUndefined();
+    expect(
+      resolveViewport({ preset: 'mobile-android' }).responsive
+    ).toBeUndefined();
   });
 
   it('responsive override to false on desktop preset', () => {

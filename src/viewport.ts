@@ -85,6 +85,41 @@ export const VIEWPORT_PRESETS = {
     deviceScaleFactor: 3,
     mobile: true,
     userAgent: MOBILE_USER_AGENT
+  },
+  'desktop-scaled': {
+    width: 1536,
+    height: 864,
+    deviceScaleFactor: 1.25,
+    mobile: false,
+    responsive: true
+  },
+  'desktop-qhd': {
+    width: 2560,
+    height: 1440,
+    deviceScaleFactor: 1,
+    mobile: false,
+    responsive: true
+  },
+  'mobile-pro': {
+    width: 393,
+    height: 852,
+    deviceScaleFactor: 3,
+    mobile: true,
+    userAgent: MOBILE_USER_AGENT
+  },
+  'mobile-large': {
+    width: 430,
+    height: 932,
+    deviceScaleFactor: 3,
+    mobile: true,
+    userAgent: MOBILE_USER_AGENT
+  },
+  'mobile-android': {
+    width: 412,
+    height: 915,
+    deviceScaleFactor: 2.625,
+    mobile: true,
+    userAgent: MOBILE_USER_AGENT
   }
 } satisfies Record<string, ViewportConfig>;
 
