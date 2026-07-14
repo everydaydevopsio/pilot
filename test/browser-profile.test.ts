@@ -1,9 +1,11 @@
-import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'fs';
-import { tmpdir } from 'os';
+import { existsSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'fs';
+import { hostname, tmpdir } from 'os';
 import { join } from 'path';
 import {
   resolveUserDataDir,
   isProfileLocked,
+  extractLockPid,
+  isProcessAlive,
   PROFILE_NAME_RE
 } from '../src/browser.js';
 
@@ -82,6 +84,66 @@ describe('PROFILE_NAME_RE', () => {
   });
 });
 
+describe('extractLockPid', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = join(tmpdir(), `aab-extract-pid-test-${Date.now()}`);
+    mkdirSync(tempDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('extracts pid and hostname from a symlink target', () => {
+    const lockPath = join(tempDir, 'SingletonLock');
+    symlinkSync('myhost-12345', lockPath);
+    const result = extractLockPid(lockPath);
+    expect(result).toEqual({ pid: 12345, lockHost: 'myhost' });
+  });
+
+  it('handles hostnames with hyphens', () => {
+    const lockPath = join(tempDir, 'SingletonLock');
+    symlinkSync('my-host-name-42', lockPath);
+    const result = extractLockPid(lockPath);
+    expect(result).toEqual({ pid: 42, lockHost: 'my-host-name' });
+  });
+
+  it('returns null for a regular file', () => {
+    const lockPath = join(tempDir, 'SingletonLock');
+    writeFileSync(lockPath, '');
+    expect(extractLockPid(lockPath)).toBeNull();
+  });
+
+  it('returns null for a non-existent file', () => {
+    expect(extractLockPid(join(tempDir, 'nofile'))).toBeNull();
+  });
+
+  it('returns null for a symlink with no hyphen', () => {
+    const lockPath = join(tempDir, 'SingletonLock');
+    symlinkSync('nopid', lockPath);
+    expect(extractLockPid(lockPath)).toBeNull();
+  });
+
+  it('returns null for a symlink with non-numeric pid', () => {
+    const lockPath = join(tempDir, 'SingletonLock');
+    symlinkSync('host-abc', lockPath);
+    expect(extractLockPid(lockPath)).toBeNull();
+  });
+});
+
+describe('isProcessAlive', () => {
+  it('returns true for the current process', () => {
+    expect(isProcessAlive(process.pid)).toBe(true);
+  });
+
+  it('returns false for a non-existent PID', () => {
+    // Use a very high PID unlikely to exist
+    expect(isProcessAlive(4000000)).toBe(false);
+  });
+});
+
 describe('isProfileLocked', () => {
   let tempDir: string;
 
@@ -99,23 +161,46 @@ describe('isProfileLocked', () => {
   });
 
   it('returns true when SingletonLock exists as a regular file', () => {
+    // Regular file = cannot extract PID, falls back to conservative (locked)
     writeFileSync(join(tempDir, 'SingletonLock'), '');
     expect(isProfileLocked(tempDir)).toBe(true);
   });
 
-  it('returns true when SingletonLock is a dangling symlink', () => {
-    // Chrome on Linux creates SingletonLock as a symlink to hostname-pid,
-    // which is a dangling symlink. existsSync would miss it.
-    symlinkSync('localhost-99999', join(tempDir, 'SingletonLock'));
-    expect(isProfileLocked(tempDir)).toBe(true);
-  });
-
-  it('returns true when lockfile exists', () => {
+  it('returns true when lockfile exists (no SingletonLock)', () => {
     writeFileSync(join(tempDir, 'lockfile'), '');
     expect(isProfileLocked(tempDir)).toBe(true);
   });
 
   it('returns false for a non-existent directory', () => {
     expect(isProfileLocked('/tmp/aab-nonexistent-dir-99999')).toBe(false);
+  });
+
+  it('cleans up stale locks when symlink PID is dead', () => {
+    const currentHost = hostname();
+    symlinkSync(`${currentHost}-99999`, join(tempDir, 'SingletonLock'));
+    writeFileSync(join(tempDir, 'lockfile'), '');
+
+    // PID 99999 is almost certainly not running
+    expect(isProfileLocked(tempDir)).toBe(false);
+
+    // Lock files should have been removed
+    expect(existsSync(join(tempDir, 'SingletonLock'))).toBe(false);
+    expect(existsSync(join(tempDir, 'lockfile'))).toBe(false);
+  });
+
+  it('returns true when symlink PID is alive', () => {
+    const currentHost = hostname();
+    // Use our own PID — guaranteed to be alive
+    const target = `${currentHost}-${process.pid}`;
+    symlinkSync(target, join(tempDir, 'SingletonLock'));
+
+    expect(isProfileLocked(tempDir)).toBe(true);
+  });
+
+  it('returns true when symlink hostname does not match', () => {
+    // Different hostname means lock was created on another machine
+    symlinkSync('other-host-99999', join(tempDir, 'SingletonLock'));
+
+    expect(isProfileLocked(tempDir)).toBe(true);
   });
 });

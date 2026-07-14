@@ -1,9 +1,9 @@
 import CDP from 'chrome-remote-interface';
 import type { Client } from 'chrome-remote-interface';
 import { spawn, type ChildProcess } from 'child_process';
-import { existsSync, lstatSync, mkdirSync, unlinkSync } from 'fs';
+import { existsSync, lstatSync, mkdirSync, readlinkSync, unlinkSync } from 'fs';
 import * as net from 'net';
-import { homedir } from 'os';
+import { homedir, hostname } from 'os';
 import { join } from 'path';
 import { getLogger } from './util/logger.js';
 import type { Config } from './util/config.js';
@@ -100,14 +100,93 @@ function fileOrSymlinkExists(filePath: string): boolean {
   }
 }
 
-export function isProfileLocked(userDataDir: string): boolean {
-  // Chrome writes SingletonLock as a symlink on Linux (target: hostname-pid).
-  // The symlink is dangling, so existsSync (which follows symlinks) returns
-  // false. Use lstatSync to detect the symlink itself.
-  return (
-    fileOrSymlinkExists(join(userDataDir, 'SingletonLock')) ||
-    existsSync(join(userDataDir, 'lockfile'))
+/**
+ * Extract the PID from a Chrome SingletonLock symlink target.
+ * On Linux, Chrome writes the symlink target as "hostname-pid".
+ * Returns the PID if extraction succeeds, or null otherwise.
+ */
+export function extractLockPid(
+  lockPath: string
+): { pid: number; lockHost: string } | null {
+  try {
+    const stat = lstatSync(lockPath);
+    if (!stat.isSymbolicLink()) return null;
+    const target = readlinkSync(lockPath);
+    // Format: "hostname-pid" — find the last hyphen to split
+    const lastDash = target.lastIndexOf('-');
+    if (lastDash === -1) return null;
+    const lockHost = target.slice(0, lastDash);
+    const pid = parseInt(target.slice(lastDash + 1), 10);
+    if (isNaN(pid) || pid <= 0) return null;
+    return { pid, lockHost };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check whether a process with the given PID is still running.
+ */
+export function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Remove stale lock files from a Chrome user data directory.
+ */
+function removeStaleLocks(userDataDir: string): void {
+  const logger = getLogger();
+  for (const lockName of ['SingletonLock', 'lockfile']) {
+    try {
+      unlinkSync(join(userDataDir, lockName));
+    } catch {
+      // lock file may not exist — that's fine
+    }
+  }
+  logger.warn(
+    { userDataDir },
+    'Cleaned up stale Chrome lock files from a previous crash'
   );
+}
+
+export function isProfileLocked(userDataDir: string): boolean {
+  const singletonPath = join(userDataDir, 'SingletonLock');
+  const lockfilePath = join(userDataDir, 'lockfile');
+
+  const hasSingleton = fileOrSymlinkExists(singletonPath);
+  const hasLockfile = existsSync(lockfilePath);
+
+  if (!hasSingleton && !hasLockfile) return false;
+
+  // Try to extract PID from SingletonLock symlink (Linux)
+  const lockInfo = hasSingleton ? extractLockPid(singletonPath) : null;
+
+  if (!lockInfo) {
+    // Cannot extract PID (macOS regular file, missing symlink, etc.)
+    // Fall back to conservative behavior: treat as locked.
+    return true;
+  }
+
+  // If the lock was created on a different host, treat as locked
+  // (e.g. shared filesystem across machines).
+  const currentHost = hostname();
+  if (lockInfo.lockHost !== currentHost) {
+    return true;
+  }
+
+  // Check if the process that created the lock is still running
+  if (isProcessAlive(lockInfo.pid)) {
+    return true;
+  }
+
+  // Process is dead — stale lock from a crash. Clean up and allow reuse.
+  removeStaleLocks(userDataDir);
+  return false;
 }
 
 export class BrowserManager {
