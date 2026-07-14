@@ -90,8 +90,7 @@ export const VIEWPORT_PRESETS = {
     width: 1536,
     height: 864,
     deviceScaleFactor: 1.25,
-    mobile: false,
-    responsive: true
+    mobile: false
   },
   'desktop-qhd': {
     width: 2560,

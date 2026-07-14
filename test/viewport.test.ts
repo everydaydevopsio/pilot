@@ -75,7 +75,7 @@ describe('resolveViewport', () => {
     expect(config.height).toBe(864);
     expect(config.deviceScaleFactor).toBe(1.25);
     expect(config.mobile).toBe(false);
-    expect(config.responsive).toBe(true);
+    expect(config.responsive).toBeUndefined();
   });
 
   it('returns desktop-qhd preset', () => {
@@ -163,13 +163,15 @@ describe('resolveViewport', () => {
   it('desktop presets default responsive to true', () => {
     expect(resolveViewport({ preset: 'desktop' }).responsive).toBe(true);
     expect(resolveViewport({ preset: 'desktop-small' }).responsive).toBe(true);
-    expect(resolveViewport({ preset: 'desktop-scaled' }).responsive).toBe(true);
     expect(resolveViewport({ preset: 'desktop-qhd' }).responsive).toBe(true);
   });
 
   it('mobile/tablet presets default responsive to undefined', () => {
     expect(resolveViewport({ preset: 'mobile' }).responsive).toBeUndefined();
     expect(resolveViewport({ preset: 'tablet' }).responsive).toBeUndefined();
+    expect(
+      resolveViewport({ preset: 'desktop-scaled' }).responsive
+    ).toBeUndefined();
     expect(
       resolveViewport({ preset: 'mobile-pro' }).responsive
     ).toBeUndefined();
