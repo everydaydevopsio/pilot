@@ -126,13 +126,19 @@ export function extractLockPid(
 
 /**
  * Check whether a process with the given PID is still running.
+ * Returns true if the process exists (even if we lack permission to signal it).
+ * Returns false only when the OS confirms the process does not exist (ESRCH).
  */
 export function isProcessAlive(pid: number): boolean {
+  if (pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    // ESRCH = no such process — the process is genuinely dead.
+    // EPERM = process exists but we lack permission to signal it — treat as alive.
+    return code !== 'ESRCH';
   }
 }
 

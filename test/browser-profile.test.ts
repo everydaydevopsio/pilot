@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'fs';
+import { lstatSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { hostname, tmpdir } from 'os';
 import { join } from 'path';
 import {
@@ -183,9 +183,10 @@ describe('isProfileLocked', () => {
     // PID 99999 is almost certainly not running
     expect(isProfileLocked(tempDir)).toBe(false);
 
-    // Lock files should have been removed
-    expect(existsSync(join(tempDir, 'SingletonLock'))).toBe(false);
-    expect(existsSync(join(tempDir, 'lockfile'))).toBe(false);
+    // Lock files should have been removed — use lstatSync to detect
+    // dangling symlinks that existsSync would miss.
+    expect(() => lstatSync(join(tempDir, 'SingletonLock'))).toThrow();
+    expect(() => lstatSync(join(tempDir, 'lockfile'))).toThrow();
   });
 
   it('returns true when symlink PID is alive', () => {
