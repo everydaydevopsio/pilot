@@ -144,7 +144,9 @@ const startShape = {
     .enum(Object.keys(VIEWPORT_PRESETS) as [string, ...string[]])
     .optional()
     .describe(
-      'Viewport preset: desktop (1920x1080), desktop-small (1366x768), tablet (768x1024), tablet-landscape (1024x768), mobile (390x844), mobile-landscape (844x390), mobile-small (360x800). Defaults to AAB_VIEWPORT env var or "desktop".'
+      `Viewport preset: ${Object.entries(VIEWPORT_PRESETS)
+        .map(([name, cfg]) => `${name} (${cfg.width}x${cfg.height})`)
+        .join(', ')}. Defaults to AAB_VIEWPORT env var or "desktop".`
     ),
   viewportWidth: z
     .number()
