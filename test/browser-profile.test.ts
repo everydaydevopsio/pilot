@@ -1,4 +1,5 @@
 import { lstatSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'fs';
+import { execSync } from 'child_process';
 import { hostname, tmpdir } from 'os';
 import { join } from 'path';
 import {
@@ -176,11 +177,15 @@ describe('isProfileLocked', () => {
   });
 
   it('cleans up stale locks when symlink PID is dead', () => {
+    // Spawn a short-lived process and wait for it to exit so the PID
+    // is guaranteed dead at assertion time — avoids flaky failures
+    // from hardcoded PIDs that might exist on CI hosts.
+    const deadPid = execSync('echo $$', { encoding: 'utf8' }).trim();
     const currentHost = hostname();
-    symlinkSync(`${currentHost}-99999`, join(tempDir, 'SingletonLock'));
+    const target = `${currentHost}-${deadPid}`;
+    symlinkSync(target, join(tempDir, 'SingletonLock'));
     writeFileSync(join(tempDir, 'lockfile'), '');
 
-    // PID 99999 is almost certainly not running
     expect(isProfileLocked(tempDir)).toBe(false);
 
     // Lock files should have been removed — use lstatSync to detect

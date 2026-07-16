@@ -144,16 +144,20 @@ export function isProcessAlive(pid: number): boolean {
 
 /**
  * Remove stale lock files from a Chrome user data directory.
+ * Only ignores ENOENT (file already gone); throws on other errors
+ * (EACCES, EPERM, etc.) so callers can fall back to treating the
+ * profile as locked.
  */
 function removeStaleLocks(userDataDir: string): void {
-  const logger = getLogger();
   for (const lockName of ['SingletonLock', 'lockfile']) {
     try {
       unlinkSync(join(userDataDir, lockName));
-    } catch {
-      // lock file may not exist — that's fine
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code !== 'ENOENT') throw err;
     }
   }
+  const logger = getLogger();
   logger.warn(
     { userDataDir },
     'Cleaned up stale Chrome lock files from a previous crash'
@@ -191,8 +195,13 @@ export function isProfileLocked(userDataDir: string): boolean {
   }
 
   // Process is dead — stale lock from a crash. Clean up and allow reuse.
-  removeStaleLocks(userDataDir);
-  return false;
+  // If cleanup fails (e.g. permission error), treat as locked to be safe.
+  try {
+    removeStaleLocks(userDataDir);
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 export class BrowserManager {
