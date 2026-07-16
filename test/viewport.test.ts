@@ -166,7 +166,7 @@ describe('resolveViewport', () => {
     expect(resolveViewport({ preset: 'desktop-qhd' }).responsive).toBe(true);
   });
 
-  it('mobile/tablet presets default responsive to undefined', () => {
+  it('non-responsive presets default responsive to undefined', () => {
     expect(resolveViewport({ preset: 'mobile' }).responsive).toBeUndefined();
     expect(resolveViewport({ preset: 'tablet' }).responsive).toBeUndefined();
     expect(
@@ -293,6 +293,20 @@ describe('applyViewport', () => {
       height: 844,
       deviceScaleFactor: 3,
       mobile: true
+    });
+  });
+
+  it('calls setDeviceMetricsOverride with 1.25 DPR for desktop-scaled (locked mode)', async () => {
+    const { client, emulation } = makeMockEmulationClient();
+    const config = resolveViewport({ preset: 'desktop-scaled' });
+
+    await applyViewport(client, config);
+
+    expect(emulation.setDeviceMetricsOverride).toHaveBeenCalledWith({
+      width: 1536,
+      height: 864,
+      deviceScaleFactor: 1.25,
+      mobile: false
     });
   });
 
