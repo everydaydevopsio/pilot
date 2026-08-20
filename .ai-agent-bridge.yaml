@@ -1,0 +1,10 @@
+version: 1
+shell: bash
+
+setup:
+  - source "${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+  - nvm use
+  - corepack enable
+  - corepack prepare pnpm@latest --activate
+  - pnpm install
+  - export PATH="$PWD/node_modules/.bin:$PATH"

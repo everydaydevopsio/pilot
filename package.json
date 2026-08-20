@@ -1,17 +1,11 @@
 {
-  "name": "@markcallen/ai-agent-browser",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
+  "name": "@everydaydevopsio/pilot",
   "version": "0.4.5",
   "description": "DevTools-grade browser control for AI agents via MCP + CDP",
   "type": "module",
   "main": "dist/mcp/index.js",
   "bin": {
-    "aab": "dist/mcp/index.js",
-    "aab-mcp": "dist/mcp/index.js",
-    "ai-agent-browser": "dist/mcp/index.js",
-    "ai-agent-browser-mcp": "dist/mcp/index.js"
+    "pilot": "dist/mcp/index.js"
   },
   "scripts": {
     "build": "rimraf ./dist && tsc",
@@ -23,7 +17,7 @@
     "prettier:fix": "prettier . --write",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "test:e2e:mcp": "AAB_HEADLESS=false jest --config jest.e2e-mcp.config.js --verbose",
+    "test:e2e:mcp": "PILOT_HEADLESS=false jest --config jest.e2e-mcp.config.js --verbose",
     "test:e2e:mcp:ci": "jest --config jest.e2e-mcp.config.js --verbose",
     "test:e2e:mcp:docker": "docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e",
     "pretest:smoke": "pnpm run build",

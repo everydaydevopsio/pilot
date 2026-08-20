@@ -44,7 +44,7 @@ export type SandboxDecision =
   { disable: false } | { disable: true; reason: 'env_override' | 'root_user' };
 
 export function sandboxDecision(): SandboxDecision {
-  const envOverride = process.env.AAB_CHROME_NO_SANDBOX;
+  const envOverride = process.env.PILOT_CHROME_NO_SANDBOX;
   if (envOverride !== undefined) {
     const truthy = envOverride === 'true' || envOverride === '1';
     return truthy
@@ -60,7 +60,7 @@ export function sandboxDecision(): SandboxDecision {
   // typically fails as root in containers, and root is the most reliable
   // signal that the sandbox cannot work. Non-root processes (including
   // non-root in containers) usually have a working sandbox — set
-  // AAB_CHROME_NO_SANDBOX=true to opt in if a specific environment
+  // PILOT_CHROME_NO_SANDBOX=true to opt in if a specific environment
   // genuinely requires it.
   if (process.getuid?.() === 0) {
     return { disable: true, reason: 'root_user' };
@@ -82,7 +82,7 @@ export function resolveUserDataDir(profileName: string): string {
   }
   const xdgData =
     process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share');
-  return join(xdgData, 'aab', profileName);
+  return join(xdgData, 'pilot', profileName);
 }
 
 function fileOrSymlinkExists(filePath: string): boolean {
@@ -264,7 +264,7 @@ export class BrowserManager {
 
   static findChromeExecutable(override?: string): string {
     if (override) return override;
-    const env = process.env.AAB_CHROME_PATH;
+    const env = process.env.PILOT_CHROME_PATH;
     if (env) return env;
 
     const platform = process.platform;
@@ -293,7 +293,7 @@ export class BrowserManager {
       if (existsSync(p)) return p;
     }
     throw new Error(
-      `Chrome not found on ${platform}. Install Google Chrome or set AAB_CHROME_PATH.`
+      `Chrome not found on ${platform}. Install Google Chrome or set PILOT_CHROME_PATH.`
     );
   }
 
@@ -374,7 +374,7 @@ export class BrowserManager {
       args.push('--no-sandbox');
       logger.warn(
         { reason: sandbox.reason },
-        'Chrome will run with --no-sandbox. The renderer sandbox is disabled; any page the agent visits runs with the same privileges as this process. Set AAB_CHROME_NO_SANDBOX=false to override, or run as a non-root user to keep the sandbox enabled.'
+        'Chrome will run with --no-sandbox. The renderer sandbox is disabled; any page the agent visits runs with the same privileges as this process. Set PILOT_CHROME_NO_SANDBOX=false to override, or run as a non-root user to keep the sandbox enabled.'
       );
     }
 

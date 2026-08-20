@@ -25,7 +25,7 @@ async function run(): Promise<void> {
     console.log(`${pkg.name} v${pkg.version}`);
     console.log(pkg.description);
     console.log('');
-    console.log('Usage: aab [command] [options]');
+    console.log('Usage: pilot [command] [options]');
     console.log('');
     console.log('Commands:');
     console.log(
@@ -39,22 +39,24 @@ async function run(): Promise<void> {
     console.log('');
     console.log('Environment variables:');
     console.log(
-      '  AAB_CDP_PORT          Chrome DevTools Protocol port (default: 9222)'
+      '  PILOT_CDP_PORT          Chrome DevTools Protocol port (default: 9222)'
     );
     console.log(
-      '  AAB_CDP_HOST          Chrome DevTools Protocol host (default: 127.0.0.1)'
+      '  PILOT_CDP_HOST          Chrome DevTools Protocol host (default: 127.0.0.1)'
     );
     console.log(
-      '  AAB_MCP_BUFFER_SIZE   Console event buffer size (default: 1000)'
+      '  PILOT_MCP_BUFFER_SIZE   Console event buffer size (default: 1000)'
     );
     console.log(
-      '  AAB_LOG_LEVEL         Log level: trace|debug|info|warn|error|fatal (default: info)'
+      '  PILOT_LOG_LEVEL         Log level: trace|debug|info|warn|error|fatal (default: info)'
     );
     console.log(
-      '  AAB_PROFILE_NAME      Browser profile name (default: profile1)'
+      '  PILOT_PROFILE_NAME      Browser profile name (default: profile1)'
     );
-    console.log('  AAB_CHROME_NO_SANDBOX Override Chrome sandbox (true/false)');
-    console.log('  AAB_VIEWPORT          Viewport preset (default: desktop)');
+    console.log(
+      '  PILOT_CHROME_NO_SANDBOX Override Chrome sandbox (true/false)'
+    );
+    console.log('  PILOT_VIEWPORT          Viewport preset (default: desktop)');
     console.log(
       '                        Presets: desktop, desktop-small, tablet,'
     );
@@ -77,11 +79,11 @@ async function run(): Promise<void> {
   }
 
   const config = {
-    bufferSize: parseInt(process.env.AAB_MCP_BUFFER_SIZE ?? '1000', 10),
-    cdpPort: process.env.AAB_CDP_PORT
-      ? parseInt(process.env.AAB_CDP_PORT, 10)
+    bufferSize: parseInt(process.env.PILOT_MCP_BUFFER_SIZE ?? '1000', 10),
+    cdpPort: process.env.PILOT_CDP_PORT
+      ? parseInt(process.env.PILOT_CDP_PORT, 10)
       : undefined,
-    cdpHost: process.env.AAB_CDP_HOST
+    cdpHost: process.env.PILOT_CDP_HOST
   };
 
   const { server, cleanup } = await createMcpServer(config);
@@ -96,10 +98,10 @@ async function run(): Promise<void> {
   process.on('SIGTERM', () => void shutdown());
 
   await server.connect(transport);
-  console.error('[aab-mcp] MCP server running on stdio');
+  console.error('[pilot] MCP server running on stdio');
 }
 
 run().catch((err) => {
-  console.error('[aab-mcp] Failed to start:', err);
+  console.error('[pilot] Failed to start:', err);
   process.exit(1);
 });

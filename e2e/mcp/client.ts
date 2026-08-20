@@ -27,8 +27,8 @@ export class McpTestClient {
       args: [resolve('dist/mcp/index.js')],
       env: {
         ...process.env,
-        AAB_MCP_BUFFER_SIZE: '500',
-        AAB_PROFILE_NAME: this.profileName,
+        PILOT_MCP_BUFFER_SIZE: '500',
+        PILOT_PROFILE_NAME: this.profileName,
         NODE_ENV: 'test'
       }
     });
@@ -68,12 +68,12 @@ export class McpTestClient {
   }
 
   async startBrowser(
-    headless = process.env.AAB_HEADLESS === 'false' ? false : true
+    headless = process.env.PILOT_HEADLESS === 'false' ? false : true
   ): Promise<void> {
     const args: Record<string, unknown> = { headless };
-    // AAB_CHROME_PATH is injected by docker-compose.e2e.yml for the mcp profile
-    if (process.env.AAB_CHROME_PATH) {
-      args.chromePath = process.env.AAB_CHROME_PATH;
+    // PILOT_CHROME_PATH is injected by docker-compose.e2e.yml for the mcp profile
+    if (process.env.PILOT_CHROME_PATH) {
+      args.chromePath = process.env.PILOT_CHROME_PATH;
     }
     await this.callTool('browser_start', args);
   }
@@ -99,7 +99,7 @@ export class McpTestClient {
     try {
       const xdgData =
         process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share');
-      const profileDir = join(xdgData, 'aab', this.profileName);
+      const profileDir = join(xdgData, 'pilot', this.profileName);
       rmSync(profileDir, { recursive: true, force: true });
     } catch {
       // best-effort cleanup

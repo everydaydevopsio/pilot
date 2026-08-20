@@ -4,7 +4,7 @@ This file provides guidance to Claude Code for working in this repository.
 
 ## Repository Facts
 
-- Canonical GitHub repo: `markcallen/ai-agent-browser`
+- Canonical GitHub repo: `everydaydevopsio/pilot`
 - Default branch: `main`
 - Primary package manager: `pnpm`
 - Version-file locations: `.nvmrc`, `package.json` (`packageManager` field)
@@ -13,18 +13,15 @@ This file provides guidance to Claude Code for working in this repository.
 - Build: `pnpm run build` — Test: `pnpm run test` — Lint: `pnpm run lint` — Coverage: `pnpm run test:coverage`
 - Coverage threshold: 50%
 
-## Publishing Override
+## Publishing
 
-**This repository publishes to GitHub Packages, not npmjs.**
+This repository publishes to **npmjs** under the `@everydaydevopsio` scope.
 
-The `publishing-apps`, `publishing-cli`, and `publishing-libraries` rules default to npmjs for TypeScript/Node packages. That default does **not** apply here:
-
-- Registry: `https://npm.pkg.github.com`
-- Package name is scoped: `@markcallen/ai-agent-browser`
-- Authentication uses `GITHUB_TOKEN` (automatic in Actions) — no `NPM_TOKEN` secret needed
-- Publish job must have `packages: write` permission
-- Do **not** add `--provenance` or `--access public` flags
-- Do **not** reference `secrets.NPM_TOKEN` in any publish workflow
+- Registry: `https://registry.npmjs.org`
+- Package name: `@everydaydevopsio/pilot`
+- Authentication uses `NODE_AUTH_TOKEN` secret (npmjs automation token)
+- Publish job has `id-token: write` for provenance
+- Publish with `npm publish --access public --provenance`
 
 ## Installed agent rules
 

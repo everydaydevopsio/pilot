@@ -30,27 +30,27 @@ export interface CliArgs {
 
 export function loadConfig(cliArgs: CliArgs = {}): Config {
   const env = {
-    cdpPort: process.env.AAB_CDP_PORT
-      ? parseInt(process.env.AAB_CDP_PORT, 10)
+    cdpPort: process.env.PILOT_CDP_PORT
+      ? parseInt(process.env.PILOT_CDP_PORT, 10)
       : undefined,
-    cdpHost: process.env.AAB_CDP_HOST,
-    cdpRetryMs: process.env.AAB_CDP_RETRY_MS
-      ? parseInt(process.env.AAB_CDP_RETRY_MS, 10)
+    cdpHost: process.env.PILOT_CDP_HOST,
+    cdpRetryMs: process.env.PILOT_CDP_RETRY_MS
+      ? parseInt(process.env.PILOT_CDP_RETRY_MS, 10)
       : undefined,
-    cdpMaxRetryMs: process.env.AAB_CDP_MAX_RETRY_MS
-      ? parseInt(process.env.AAB_CDP_MAX_RETRY_MS, 10)
+    cdpMaxRetryMs: process.env.PILOT_CDP_MAX_RETRY_MS
+      ? parseInt(process.env.PILOT_CDP_MAX_RETRY_MS, 10)
       : undefined,
-    logLevel: process.env.AAB_LOG_LEVEL,
-    chromePath: process.env.AAB_CHROME_PATH,
+    logLevel: process.env.PILOT_LOG_LEVEL,
+    chromePath: process.env.PILOT_CHROME_PATH,
     headless:
-      process.env.AAB_HEADLESS !== undefined
-        ? process.env.AAB_HEADLESS !== 'false'
+      process.env.PILOT_HEADLESS !== undefined
+        ? process.env.PILOT_HEADLESS !== 'false'
         : undefined,
-    profileName: process.env.AAB_PROFILE_NAME,
-    viewport: process.env.AAB_VIEWPORT,
+    profileName: process.env.PILOT_PROFILE_NAME,
+    viewport: process.env.PILOT_VIEWPORT,
     responsive:
-      process.env.AAB_RESPONSIVE !== undefined
-        ? process.env.AAB_RESPONSIVE !== 'false'
+      process.env.PILOT_RESPONSIVE !== undefined
+        ? process.env.PILOT_RESPONSIVE !== 'false'
         : undefined
   };
 

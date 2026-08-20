@@ -57,7 +57,7 @@ describe('BrowserManager', () => {
   it('schedules reconnect when Chrome not reachable', async () => {
     MockCDP.List = jest.fn().mockRejectedValue(new Error('ECONNREFUSED'));
 
-    process.env.AAB_CDP_RETRY_MS = '5000';
+    process.env.PILOT_CDP_RETRY_MS = '5000';
     const config = loadConfig();
     const manager = new BrowserManager(config);
 
@@ -122,7 +122,7 @@ describe('BrowserManager', () => {
       >
     ).mockResolvedValue(eventEmitter as never);
 
-    process.env.AAB_CDP_RETRY_MS = '60000';
+    process.env.PILOT_CDP_RETRY_MS = '60000';
     const config = loadConfig();
     const manager = new BrowserManager(config);
 
@@ -284,7 +284,7 @@ describe('BrowserManager', () => {
         >
       ).mockResolvedValue(mockClient as never);
 
-      process.env.AAB_CDP_RETRY_MS = '60000';
+      process.env.PILOT_CDP_RETRY_MS = '60000';
       const config = loadConfig();
       const manager = new BrowserManager(config);
       await manager.connect();

@@ -50,13 +50,13 @@ export async function runInit(
   console.log('');
   console.log('\x1b[1mThe skill will:\x1b[0m');
   console.log('  1. Start Chrome with remote debugging');
-  console.log('  2. Launch the ai-agent-browser service');
+  console.log('  2. Launch the pilot browser service');
   console.log('  3. Add the MCP server to your session');
   console.log('  4. Spawn an error-watching sub-agent');
   console.log('');
   console.log('\x1b[1mPrerequisites:\x1b[0m');
   console.log('  - Google Chrome installed');
   console.log(
-    '  - ai-agent-browser (install with: npm install -g ai-agent-browser)'
+    '  - pilot (install with: npm install -g @everydaydevopsio/pilot)'
   );
 }

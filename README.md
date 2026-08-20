@@ -1,12 +1,15 @@
-# ai-agent-browser
+# pilot
 
-[![CI](https://github.com/markcallen/ai-agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/markcallen/ai-agent-browser/actions/workflows/ci.yml)
-[![E2E](https://github.com/markcallen/ai-agent-browser/actions/workflows/e2e.yml/badge.svg)](https://github.com/markcallen/ai-agent-browser/actions/workflows/e2e.yml)
-[![Smoke](https://github.com/markcallen/ai-agent-browser/actions/workflows/smoke.yml/badge.svg)](https://github.com/markcallen/ai-agent-browser/actions/workflows/smoke.yml)
-[![License](https://img.shields.io/github/license/markcallen/ai-agent-browser)](LICENSE)
-[![GitHub Release](https://img.shields.io/github/v/release/markcallen/ai-agent-browser)](https://github.com/markcallen/ai-agent-browser/releases)
+[![CI](https://github.com/everydaydevopsio/pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/everydaydevopsio/pilot/actions/workflows/ci.yml)
+[![E2E](https://github.com/everydaydevopsio/pilot/actions/workflows/e2e.yml/badge.svg)](https://github.com/everydaydevopsio/pilot/actions/workflows/e2e.yml)
+[![Smoke](https://github.com/everydaydevopsio/pilot/actions/workflows/smoke.yml/badge.svg)](https://github.com/everydaydevopsio/pilot/actions/workflows/smoke.yml)
+[![License](https://img.shields.io/github/license/everydaydevopsio/pilot)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/everydaydevopsio/pilot)](https://github.com/everydaydevopsio/pilot/releases)
+[![npm version](https://img.shields.io/npm/v/@everydaydevopsio/pilot.svg)](https://www.npmjs.com/package/@everydaydevopsio/pilot)
 
 A lightweight Node.js/TypeScript MCP server that gives AI agents DevTools-grade control over a running Chrome instance. Connects to Chrome via the Chrome DevTools Protocol (CDP) and exposes MCP tools for screenshots, navigation, clicks, typing, JavaScript evaluation, and live console/network event monitoring.
+
+Use pilot to open a URL and watch for errors — from any AI agent that speaks MCP.
 
 ## Prerequisites
 
@@ -57,8 +60,8 @@ pnpm start
 To use the MCP server from a Docker container, pass `-i` so stdin stays open for stdio communication:
 
 ```bash
-docker build -t ai-agent-browser .
-claude mcp add ai-agent-browser -- docker run -i --rm ai-agent-browser
+docker build -t pilot .
+claude mcp add pilot -- docker run -i --rm pilot
 ```
 
 ## Claude Code Integration
@@ -67,10 +70,10 @@ Add the MCP server to Claude Code:
 
 ```bash
 # Via npx (no install required)
-claude mcp add ai-agent-browser -- npx @markcallen/ai-agent-browser
+claude mcp add pilot -- npx @everydaydevopsio/pilot
 
 # Or from a local build
-claude mcp add ai-agent-browser -- node /path/to/ai-agent-browser/dist/mcp/index.js
+claude mcp add pilot -- node /path/to/pilot/dist/mcp/index.js
 ```
 
 Or add to `.mcp.json` in your project:
@@ -78,10 +81,10 @@ Or add to `.mcp.json` in your project:
 ```json
 {
   "mcpServers": {
-    "ai-agent-browser": {
+    "pilot": {
       "type": "stdio",
       "command": "npx",
-      "args": ["@markcallen/ai-agent-browser"]
+      "args": ["@everydaydevopsio/pilot"]
     }
   }
 }
@@ -121,19 +124,19 @@ Or add to `.mcp.json` in your project:
 
 All configuration via environment variables.
 
-| Env var                 | Default     | Description                                                                                                                                                                                                                                                          |
-| ----------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AAB_CDP_PORT`          | `9222`      | CDP port when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                                                                                                        |
-| `AAB_CDP_HOST`          | `127.0.0.1` | CDP host when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                                                                                                        |
-| `AAB_LOG_LEVEL`         | `info`      | Pino log level                                                                                                                                                                                                                                                       |
-| `AAB_CHROME_PATH`       | (auto)      | Path to Chrome executable                                                                                                                                                                                                                                            |
-| `AAB_HEADLESS`          | `true`      | Run Chrome headless                                                                                                                                                                                                                                                  |
-| `AAB_MCP_BUFFER_SIZE`   | `1000`      | Console message buffer size                                                                                                                                                                                                                                          |
-| `AAB_PROFILE_NAME`      | `profile1`  | Persistent browser profile name. Profiles are stored under `$XDG_DATA_HOME/aab/<name>` (default `~/.local/share/aab/<name>`).                                                                                                                                        |
-| `AAB_RESPONSIVE`        | (preset)    | Responsive viewport mode. When `true`, the page uses real window dimensions and reflows on resize. Desktop presets default to `true`; mobile/tablet presets leave this unset (locked viewport). Set to `false` to lock the viewport with `setDeviceMetricsOverride`. |
-| `AAB_CHROME_NO_SANDBOX` | (auto)      | Force `--no-sandbox` on/off. Accepts `true`/`1` or `false`/`0`. When unset, the flag is auto-applied only when running as root on Linux. See [Chrome sandbox](#chrome-sandbox) below.                                                                                |
+| Env var                   | Default     | Description                                                                                                                                                                                                                                                          |
+| ------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PILOT_CDP_PORT`          | `9222`      | CDP port when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                                                                                                        |
+| `PILOT_CDP_HOST`          | `127.0.0.1` | CDP host when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                                                                                                        |
+| `PILOT_LOG_LEVEL`         | `info`      | Pino log level                                                                                                                                                                                                                                                       |
+| `PILOT_CHROME_PATH`       | (auto)      | Path to Chrome executable                                                                                                                                                                                                                                            |
+| `PILOT_HEADLESS`          | `true`      | Run Chrome headless                                                                                                                                                                                                                                                  |
+| `PILOT_MCP_BUFFER_SIZE`   | `1000`      | Console message buffer size                                                                                                                                                                                                                                          |
+| `PILOT_PROFILE_NAME`      | `profile1`  | Persistent browser profile name. Profiles are stored under `$XDG_DATA_HOME/pilot/<name>` (default `~/.local/share/pilot/<name>`).                                                                                                                                    |
+| `PILOT_RESPONSIVE`        | (preset)    | Responsive viewport mode. When `true`, the page uses real window dimensions and reflows on resize. Desktop presets default to `true`; mobile/tablet presets leave this unset (locked viewport). Set to `false` to lock the viewport with `setDeviceMetricsOverride`. |
+| `PILOT_CHROME_NO_SANDBOX` | (auto)      | Force `--no-sandbox` on/off. Accepts `true`/`1` or `false`/`0`. When unset, the flag is auto-applied only when running as root on Linux. See [Chrome sandbox](#chrome-sandbox) below.                                                                                |
 
-> **Tip — seeing the browser window:** By default Chrome runs headless (no visible window). To watch the browser while the agent works, ask the AI agent: _"set headless to false"_ (or _"run Chrome with a visible window"_). The agent will set `AAB_HEADLESS=false` before calling `browser_start`, and a Chrome window will appear on your desktop.
+> **Tip — seeing the browser window:** By default Chrome runs headless (no visible window). To watch the browser while the agent works, ask the AI agent: _"set headless to false"_ (or _"run Chrome with a visible window"_). The agent will set `PILOT_HEADLESS=false` before calling `browser_start`, and a Chrome window will appear on your desktop.
 
 ### Responsive viewport mode
 
@@ -141,7 +144,7 @@ Desktop presets (`desktop`, `desktop-small`) default to **responsive mode**. In 
 
 Mobile and tablet presets use a **locked viewport** (via `setDeviceMetricsOverride`) to emulate exact device dimensions regardless of the actual window size.
 
-To lock the viewport on desktop (the old behavior), set `responsive: false` in `browser_start` or `AAB_RESPONSIVE=false`.
+To lock the viewport on desktop (the old behavior), set `responsive: false` in `browser_start` or `PILOT_RESPONSIVE=false`.
 
 #### Resizing at runtime
 
@@ -159,10 +162,10 @@ The Chrome renderer sandbox is the primary defense against a compromised page (o
 
 `--no-sandbox` is auto-applied only when the server is running as **root** on Linux — the most common case where Chrome's user-namespace sandbox fails to initialize. In every other case (non-root user, macOS, Windows, non-root inside a container) the sandbox stays on.
 
-Override the auto-detection with `AAB_CHROME_NO_SANDBOX`:
+Override the auto-detection with `PILOT_CHROME_NO_SANDBOX`:
 
-- `AAB_CHROME_NO_SANDBOX=true` — force the flag on (e.g. an environment where the sandbox cannot work and you have accepted the risk).
-- `AAB_CHROME_NO_SANDBOX=false` — force the flag off, even when running as root.
+- `PILOT_CHROME_NO_SANDBOX=true` — force the flag on (e.g. an environment where the sandbox cannot work and you have accepted the risk).
+- `PILOT_CHROME_NO_SANDBOX=false` — force the flag off, even when running as root.
 
 When the flag is applied, the server emits a `warn`-level log on launch so operators can see that the agent is browsing without the renderer sandbox. The safest Docker setup is to run the container as a non-root user with a working Chrome sandbox helper, rather than relying on `--no-sandbox`.
 
@@ -218,13 +221,13 @@ The `init` command creates a Claude Code skill in your project that automates th
 
 ```bash
 # Using npx (no installation required)
-npx @markcallen/ai-agent-browser init
+npx @everydaydevopsio/pilot init
 
 # If installed globally
-aab init
+pilot init
 
 # Overwrite existing skill
-aab init --force
+pilot init --force
 ```
 
 This creates `.claude/skills/debug-browser/SKILL.md` in your project.
@@ -239,7 +242,7 @@ In Claude Code, say **"debug in browser"** or use **/debug-browser**. The skill 
 
 ### Error Watching Workflow
 
-1. Ask Claude: "Watch for errors while I test the checkout flow"
+1. Ask Claude: "Use pilot to open localhost:3000 and watch for errors"
 2. Claude clears the error buffer and tells you to proceed
 3. You interact with the app in Chrome
 4. Claude periodically checks for errors and can fix them in your source code

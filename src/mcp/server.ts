@@ -22,7 +22,7 @@ export async function createMcpServer(config: McpConfig): Promise<{
   cleanup: () => Promise<void>;
 }> {
   const server = new McpServer({
-    name: 'ai-agent-browser',
+    name: 'pilot',
     version: '0.1.0'
   });
 

@@ -28,17 +28,17 @@ describe('CLI flags', () => {
   it('--help prints usage info and exits 0', () => {
     const result = spawnSync('node', [ENTRY, '--help'], { encoding: 'utf-8' });
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('Usage: aab');
+    expect(result.stdout).toContain('Usage: pilot');
     expect(result.stdout).toContain('--version');
     expect(result.stdout).toContain('--help');
-    expect(result.stdout).toContain('AAB_CDP_PORT');
+    expect(result.stdout).toContain('PILOT_CDP_PORT');
     expect(result.stderr).toBe('');
   });
 
   it('-h prints usage info and exits 0', () => {
     const result = spawnSync('node', [ENTRY, '-h'], { encoding: 'utf-8' });
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('Usage: aab');
+    expect(result.stdout).toContain('Usage: pilot');
     expect(result.stderr).toBe('');
   });
 

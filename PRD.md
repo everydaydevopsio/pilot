@@ -1,14 +1,14 @@
-# PRD — ai-agent-browser (aab) v0.5
+# PRD — pilot v0.5
 
 ## Overview
 
-`ai-agent-browser` is a lightweight Node.js/TypeScript MCP (Model Context Protocol)
+`pilot` is a lightweight Node.js/TypeScript MCP (Model Context Protocol)
 server that gives AI agents DevTools-grade control over a Chrome instance. It launches
 and manages Chrome via the Chrome DevTools Protocol (CDP) and exposes browser automation
 as **MCP tools** that let an agent take screenshots, navigate, click, type, manage tabs,
 run JavaScript, and inspect console logs — all through the standard MCP stdio transport.
 
-It is published as `@markcallen/ai-agent-browser` on GitHub Packages and can be used
+It is published as `@everydaydevopsio/pilot` on npmjs and can be used
 directly with Claude Code, or any MCP-compatible AI agent.
 
 ---
@@ -19,14 +19,14 @@ AI agents that interact with web applications need more than screenshots: they n
 act (click, type, navigate) and observe (console errors, page state) —
 all without screen-scraping a VNC stream or relying on browser extensions.
 
-`ai-agent-browser` bridges this gap by wrapping Chrome DevTools Protocol in an
+`pilot` bridges this gap by wrapping Chrome DevTools Protocol in an
 MCP-native interface. Any MCP-compatible agent can launch a browser, interact with web
 pages, and inspect results using standard tool calls.
 
 ```
 AI Agent (Claude Code, etc.)
   └─ MCP stdio transport
-        └─ aab (MCP server)
+        └─ pilot (MCP server)
               └─ CDP connection
                     └─ Chrome (headless or headed)
 ```
@@ -58,12 +58,12 @@ AI Agent (Claude Code, etc.)
 
 ## Users and consumers
 
-| Consumer                     | How they use aab                                                    |
-| ---------------------------- | ------------------------------------------------------------------- |
-| AI agent (Claude Code, etc.) | Uses MCP tools to control the browser                               |
-| Developer using Claude Code  | Runs `aab init` to install the debug-browser skill, then uses tools |
-| `ai-agent-desktop-manager`   | Can start aab as a managed process alongside a desktop              |
-| Human operator               | Reads logs; uses `aab --version` to verify installation             |
+| Consumer                     | How they use pilot                                                    |
+| ---------------------------- | --------------------------------------------------------------------- |
+| AI agent (Claude Code, etc.) | Uses MCP tools to control the browser                                 |
+| Developer using Claude Code  | Runs `pilot init` to install the debug-browser skill, then uses tools |
+| `ai-agent-desktop-manager`   | Can start pilot as a managed process alongside a desktop              |
+| Human operator               | Reads logs; uses `pilot --version` to verify installation             |
 
 ---
 
@@ -71,18 +71,18 @@ AI Agent (Claude Code, etc.)
 
 ### MCP server model
 
-`aab` runs as an MCP server communicating over stdio. The AI agent (e.g. Claude Code)
+`pilot` runs as an MCP server communicating over stdio. The AI agent (e.g. Claude Code)
 launches the process and sends tool calls via the MCP protocol. Results are returned
 as structured tool responses.
 
 ```
-claude mcp add ai-agent-browser -- npx @markcallen/ai-agent-browser
+claude mcp add pilot -- npx @everydaydevopsio/pilot
   └─ MCP stdio transport (stdin/stdout)
-        └─ aab process
+        └─ pilot process
               ├─ BrowserManager (Chrome lifecycle)
               │     ├─ Chrome launcher (auto-detect path, find free port)
               │     ├─ CDP connection + reconnect with exponential backoff
-              │     └─ Profile management (~/.local/share/aab/<name>/)
+              │     └─ Profile management (~/.local/share/pilot/<name>/)
               ├─ ConsoleBuffer (ring buffer, default 1000 entries)
               └─ Pino logger (stderr, stdout reserved for MCP)
 ```
@@ -91,28 +91,28 @@ claude mcp add ai-agent-browser -- npx @markcallen/ai-agent-browser
 
 The agent explicitly starts and stops Chrome through MCP tools:
 
-1. Agent calls `browser_start` → aab launches Chrome, connects via CDP, applies viewport.
+1. Agent calls `browser_start` → pilot launches Chrome, connects via CDP, applies viewport.
 2. Agent uses browser tools (`browser_navigate`, `browser_click`, etc.).
-3. Agent calls `browser_stop` → aab kills Chrome and cleans up.
+3. Agent calls `browser_stop` → pilot kills Chrome and cleans up.
 
-If Chrome disconnects unexpectedly, aab attempts reconnect with exponential backoff
+If Chrome disconnects unexpectedly, pilot attempts reconnect with exponential backoff
 (starting at `cdpRetryMs`, doubling up to `cdpMaxRetryMs`). CDP domains (`Network`,
 `Console`, `Page`, `Runtime`) are re-enabled on reconnect.
 
 ### Profile management
 
-Chrome user data is stored in `$XDG_DATA_HOME/aab/<profileName>/` (default
-`~/.local/share/aab/profile1/`). Profile names are validated against
+Chrome user data is stored in `$XDG_DATA_HOME/pilot/<profileName>/` (default
+`~/.local/share/pilot/profile1/`). Profile names are validated against
 `^[a-zA-Z0-9][a-zA-Z0-9_-]*$`.
 
-Stale lock detection: on launch, aab checks Chrome's `SingletonLock` symlink. If the
+Stale lock detection: on launch, pilot checks Chrome's `SingletonLock` symlink. If the
 lock references a PID on the current host that is no longer running, the lock is
 automatically cleaned up so the profile can be reused.
 
 ### Console buffer
 
 Since MCP stdio does not support server-initiated push events, console and error
-messages are captured in a ring buffer (configurable size via `AAB_MCP_BUFFER_SIZE`,
+messages are captured in a ring buffer (configurable size via `PILOT_MCP_BUFFER_SIZE`,
 default 1000). Agents poll for messages using `browser_get_console_logs`,
 `browser_get_errors`, and `browser_clear_errors`.
 
@@ -380,7 +380,7 @@ Clear the entire console buffer.
 
 Viewport presets configure the browser window size, device pixel ratio, mobile
 emulation, and touch emulation. They are specified at launch via the `viewport`
-parameter of `browser_start` or the `AAB_VIEWPORT` environment variable.
+parameter of `browser_start` or the `PILOT_VIEWPORT` environment variable.
 
 | Preset             | Width × Height | DPR   | Mobile | Description              |
 | ------------------ | -------------- | ----- | ------ | ------------------------ |
@@ -428,7 +428,7 @@ management but are not currently exposed to agents.
 ### Binary names
 
 The package provides four equivalent binary entry points:
-`aab`, `aab-mcp`, `ai-agent-browser`, `ai-agent-browser-mcp`
+`pilot`
 
 ### Commands
 
@@ -440,12 +440,12 @@ The package provides four equivalent binary entry points:
 | `--version`    | Print version                               |
 | `--help`       | Print usage                                 |
 
-### `aab init`
+### `pilot init`
 
 Writes a Claude Code skill file to `.claude/skills/debug-browser/SKILL.md`. The skill
 template instructs Claude Code to:
 
-1. Add the MCP server: `claude mcp add ai-agent-browser --scope session -- npx @markcallen/ai-agent-browser`
+1. Add the MCP server: `claude mcp add pilot --scope session -- npx @everydaydevopsio/pilot`
 2. Start the browser with `browser_start`
 3. Spawn a background error-watching sub-agent
 
@@ -456,20 +456,20 @@ template instructs Claude Code to:
 All configuration via environment variables. CLI flags are limited to `--version`,
 `--help`, and the `init` subcommand.
 
-| Env var                 | Type            | Default       | Description                                        |
-| ----------------------- | --------------- | ------------- | -------------------------------------------------- |
-| `AAB_CDP_PORT`          | integer         | `9222`        | Chrome DevTools Protocol port                      |
-| `AAB_CDP_HOST`          | string          | `127.0.0.1`   | CDP host                                           |
-| `AAB_CDP_RETRY_MS`      | integer (≥100)  | `2000`        | Initial CDP reconnect interval (ms)                |
-| `AAB_CDP_MAX_RETRY_MS`  | integer (≥1000) | `30000`       | Max CDP reconnect interval (ms)                    |
-| `AAB_LOG_LEVEL`         | enum            | `info`        | Pino log level (trace/debug/info/warn/error/fatal) |
-| `AAB_CHROME_PATH`       | string          | auto-detected | Path to Chrome executable                          |
-| `AAB_HEADLESS`          | boolean         | `true`        | Run Chrome in headless mode                        |
-| `AAB_CHROME_NO_SANDBOX` | boolean         | `false`       | Disable Chrome sandbox (auto-enabled as root)      |
-| `AAB_PROFILE_NAME`      | string          | `profile1`    | Chrome profile directory name                      |
-| `AAB_VIEWPORT`          | string          | `desktop`     | Default viewport preset                            |
-| `AAB_RESPONSIVE`        | boolean         | —             | Enable responsive mode                             |
-| `AAB_MCP_BUFFER_SIZE`   | integer         | `1000`        | Console ring buffer size                           |
+| Env var                   | Type            | Default       | Description                                        |
+| ------------------------- | --------------- | ------------- | -------------------------------------------------- |
+| `PILOT_CDP_PORT`          | integer         | `9222`        | Chrome DevTools Protocol port                      |
+| `PILOT_CDP_HOST`          | string          | `127.0.0.1`   | CDP host                                           |
+| `PILOT_CDP_RETRY_MS`      | integer (≥100)  | `2000`        | Initial CDP reconnect interval (ms)                |
+| `PILOT_CDP_MAX_RETRY_MS`  | integer (≥1000) | `30000`       | Max CDP reconnect interval (ms)                    |
+| `PILOT_LOG_LEVEL`         | enum            | `info`        | Pino log level (trace/debug/info/warn/error/fatal) |
+| `PILOT_CHROME_PATH`       | string          | auto-detected | Path to Chrome executable                          |
+| `PILOT_HEADLESS`          | boolean         | `true`        | Run Chrome in headless mode                        |
+| `PILOT_CHROME_NO_SANDBOX` | boolean         | `false`       | Disable Chrome sandbox (auto-enabled as root)      |
+| `PILOT_PROFILE_NAME`      | string          | `profile1`    | Chrome profile directory name                      |
+| `PILOT_VIEWPORT`          | string          | `desktop`     | Default viewport preset                            |
+| `PILOT_RESPONSIVE`        | boolean         | —             | Enable responsive mode                             |
+| `PILOT_MCP_BUFFER_SIZE`   | integer         | `1000`        | Console ring buffer size                           |
 
 Chrome path auto-detection checks platform-specific default locations:
 
@@ -478,7 +478,7 @@ Chrome path auto-detection checks platform-specific default locations:
 - **Windows**: Program Files Chrome paths
 
 Sandbox is automatically disabled when running as root on Linux/Windows, or when
-`AAB_CHROME_NO_SANDBOX=true`.
+`PILOT_CHROME_NO_SANDBOX=true`.
 
 ---
 
@@ -513,7 +513,7 @@ Sandbox is automatically disabled when running as root on Linux/Windows, or when
 ## Project structure
 
 ```
-ai-agent-browser/
+pilot/
 ├── src/
 │   ├── browser.ts              # BrowserManager: Chrome lifecycle, CDP, reconnect
 │   ├── viewport.ts             # Viewport presets and emulation
@@ -557,7 +557,7 @@ ai-agent-browser/
 
 ## Acceptance criteria
 
-1. `npx @markcallen/ai-agent-browser` starts the MCP server on stdio successfully.
+1. `npx @everydaydevopsio/pilot` starts the MCP server on stdio successfully.
 2. `browser_start` launches Chrome, connects via CDP, and returns confirmation.
 3. `browser_screenshot` returns a valid base64-encoded image.
 4. `browser_navigate` to `https://example.com` succeeds with status `200`.
@@ -571,10 +571,10 @@ ai-agent-browser/
 10. `browser_get_console_logs` returns buffered console messages with level filtering.
 11. `browser_get_errors` returns error-level messages; `browser_clear_errors` clears them.
 12. `browser_stop` kills Chrome and cleans up resources.
-13. If Chrome crashes, aab reconnects automatically with exponential backoff.
+13. If Chrome crashes, pilot reconnects automatically with exponential backoff.
 14. Stale profile locks from dead processes are detected and cleaned up.
 15. All viewport presets produce correct device emulation (DPR, mobile UA, touch).
-16. `aab init` writes a valid Claude Code skill file.
+16. `pilot init` writes a valid Claude Code skill file.
 17. All tests pass; TypeScript builds clean in strict mode; coverage meets 50% threshold.
 
 ---

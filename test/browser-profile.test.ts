@@ -23,13 +23,15 @@ describe('resolveUserDataDir', () => {
 
   it('uses XDG_DATA_HOME when set', () => {
     process.env.XDG_DATA_HOME = '/tmp/xdg-test';
-    expect(resolveUserDataDir('myprofile')).toBe('/tmp/xdg-test/aab/myprofile');
+    expect(resolveUserDataDir('myprofile')).toBe(
+      '/tmp/xdg-test/pilot/myprofile'
+    );
   });
 
   it('falls back to ~/.local/share when XDG_DATA_HOME is unset', () => {
     delete process.env.XDG_DATA_HOME;
     const result = resolveUserDataDir('profile1');
-    expect(result).toMatch(/\.local\/share\/aab\/profile1$/);
+    expect(result).toMatch(/\.local\/share\/pilot\/profile1$/);
   });
 
   it('throws on empty profile name', () => {
@@ -89,7 +91,7 @@ describe('extractLockPid', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = join(tmpdir(), `aab-extract-pid-test-${Date.now()}`);
+    tempDir = join(tmpdir(), `pilot-extract-pid-test-${Date.now()}`);
     mkdirSync(tempDir, { recursive: true });
   });
 
@@ -149,7 +151,7 @@ describe('isProfileLocked', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = join(tmpdir(), `aab-lock-test-${Date.now()}`);
+    tempDir = join(tmpdir(), `pilot-lock-test-${Date.now()}`);
     mkdirSync(tempDir, { recursive: true });
   });
 
@@ -173,7 +175,7 @@ describe('isProfileLocked', () => {
   });
 
   it('returns false for a non-existent directory', () => {
-    expect(isProfileLocked('/tmp/aab-nonexistent-dir-99999')).toBe(false);
+    expect(isProfileLocked('/tmp/pilot-nonexistent-dir-99999')).toBe(false);
   });
 
   it('cleans up stale locks when symlink PID is dead', () => {

@@ -1,6 +1,6 @@
 export const SKILL_CONTENT = `---
 name: debug-browser
-description: Add the ai-agent-browser MCP server and watch for console errors. Use this skill when the user wants to debug a web application, watch for JavaScript errors, or test their app with AI assistance.
+description: Add the pilot MCP server and watch for console errors. Use this skill when the user wants to debug a web application, watch for JavaScript errors, or test their app with AI assistance.
 tools:
   - Bash
   - Task
@@ -8,11 +8,11 @@ tools:
 
 # Debug Browser Skill
 
-This skill sets up a browser debugging environment for AI-assisted development using the ai-agent-browser MCP server. The MCP server manages the Chrome lifecycle automatically via \`browser_start\`.
+This skill sets up a browser debugging environment for AI-assisted development using the pilot MCP server. The MCP server manages the Chrome lifecycle automatically via \`browser_start\`.
 
 ## What This Skill Does
 
-1. Adds the ai-agent-browser MCP server to your Claude Code session
+1. Adds the pilot MCP server to your Claude Code session
 2. Starts the browser via \`browser_start\`
 3. Spawns a sub-agent to watch for console errors
 
@@ -22,10 +22,10 @@ Follow these steps in order.
 
 ### Step 1: Add MCP Server to Claude Code Session
 
-Add the ai-agent-browser MCP server to the current Claude Code session:
+Add the pilot MCP server to the current Claude Code session:
 
 \`\`\`bash
-claude mcp add ai-agent-browser --scope session -- npx @markcallen/ai-agent-browser
+claude mcp add pilot --scope session -- npx @everydaydevopsio/pilot
 \`\`\`
 
 This gives you access to browser control tools like:
@@ -85,7 +85,7 @@ When done debugging, call \`browser_stop\` to shut down Chrome cleanly.
 
 ### browser_start fails
 - Check if Chrome is installed: the MCP server auto-detects common paths
-- Set \`AAB_CHROME_PATH\` env var to the Chrome executable if auto-detect fails
+- Set \`PILOT_CHROME_PATH\` env var to the Chrome executable if auto-detect fails
 
 ### No errors detected
 - Errors are only captured while connected

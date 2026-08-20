@@ -128,7 +128,7 @@ const startShape = {
     .boolean()
     .optional()
     .describe(
-      'Run Chrome headless. When omitted, falls back to AAB_HEADLESS (default: true).'
+      'Run Chrome headless. When omitted, falls back to PILOT_HEADLESS (default: true).'
     ),
   chromePath: z
     .string()
@@ -138,7 +138,7 @@ const startShape = {
     .string()
     .optional()
     .describe(
-      'Browser profile name. Data is stored under $XDG_DATA_HOME/aab/<profileName>/ (default: ~/.local/share/aab/<profileName>/). Defaults to AAB_PROFILE_NAME env var or "profile1".'
+      'Browser profile name. Data is stored under $XDG_DATA_HOME/pilot/<profileName>/ (default: ~/.local/share/pilot/<profileName>/). Defaults to PILOT_PROFILE_NAME env var or "profile1".'
     ),
   viewport: z
     .enum(Object.keys(VIEWPORT_PRESETS) as [string, ...string[]])
@@ -146,7 +146,7 @@ const startShape = {
     .describe(
       `Viewport preset: ${Object.entries(VIEWPORT_PRESETS)
         .map(([name, cfg]) => `${name} (${cfg.width}x${cfg.height})`)
-        .join(', ')}. Defaults to AAB_VIEWPORT env var or "desktop".`
+        .join(', ')}. Defaults to PILOT_VIEWPORT env var or "desktop".`
     ),
   viewportWidth: z
     .number()

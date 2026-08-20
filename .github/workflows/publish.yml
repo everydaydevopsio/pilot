@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
+      id-token: write
     steps:
       - name: Determine version
         id: version
@@ -121,7 +121,7 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-          registry-url: 'https://npm.pkg.github.com'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -144,10 +144,10 @@ jobs:
       - name: Verify CLI starts
         run: node dist/mcp/index.js --help
 
-      - name: Publish to GitHub Packages
-        run: npm publish
+      - name: Publish to npmjs
+        run: npm publish --access public --provenance
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3

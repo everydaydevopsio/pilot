@@ -10,4 +10,4 @@ services:
     shm_size: '1gb'
     command: pnpm run test:e2e:mcp:ci
     environment:
-      - AAB_CHROME_PATH=/usr/bin/google-chrome-stable
+      - PILOT_CHROME_PATH=/usr/bin/google-chrome-stable
