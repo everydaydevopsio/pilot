@@ -16,7 +16,7 @@ directly with Claude Code, or any MCP-compatible AI agent.
 ## Context and motivation
 
 AI agents that interact with web applications need more than screenshots: they need to
-act (click, type, navigate) and observe (console errors, network failures, page state) —
+act (click, type, navigate) and observe (console errors, page state) —
 all without screen-scraping a VNC stream or relying on browser extensions.
 
 `ai-agent-browser` bridges this gap by wrapping Chrome DevTools Protocol in an
@@ -41,7 +41,7 @@ AI Agent (Claude Code, etc.)
 - Support multi-tab browsing with tab creation, switching, and closing.
 - Provide viewport presets for testing responsive designs across desktop, tablet, and
   mobile form factors.
-- Buffer console and network events for poll-based retrieval (since MCP stdio does not
+- Buffer console events for poll-based retrieval (since MCP stdio does not
   support push events).
 - Be simple enough that any agent can use it with a short system prompt description.
 
@@ -166,12 +166,8 @@ Navigate the active page to a URL.
 | `waitUntil` | `"load"` \| `"domcontentloaded"` \| `"networkidle"` | no       | `"load"` |
 | `timeoutMs` | integer                                             | no       | `30000`  |
 
-**Result**
-
-| Field    | Type    | Description                            |
-| -------- | ------- | -------------------------------------- |
-| `url`    | string  | Final URL after redirects              |
-| `status` | integer | HTTP status of the main frame response |
+**Result**: Text confirmation including the final URL and HTTP status code
+(e.g. `Navigated to https://example.com (status: 200)`).
 
 #### `browser_page_info`
 
@@ -201,11 +197,7 @@ Wait for a condition before responding.
 | `ms`              | integer | Fixed delay in milliseconds                            |
 | `timeoutMs`       | integer | Overall timeout. Default: `10000`                      |
 
-**Result**
-
-| Field     | Type    | Description         |
-| --------- | ------- | ------------------- |
-| `elapsed` | integer | Milliseconds waited |
+**Result**: Text confirmation with elapsed time (e.g. `Wait completed in 250ms`).
 
 ---
 
@@ -226,12 +218,7 @@ Click an element or coordinates.
 | `clickCount` | integer                             | `1`      | Number of clicks             |
 | `timeoutMs`  | integer                             | `5000`   | Timeout waiting for selector |
 
-**Result**
-
-| Field | Type   | Description    |
-| ----- | ------ | -------------- |
-| `x`   | number | Actual click X |
-| `y`   | number | Actual click Y |
+**Result**: Text confirmation with click coordinates (e.g. `Clicked at (150, 300)`).
 
 #### `browser_type`
 
@@ -305,7 +292,8 @@ Open a new tab and switch to it.
 | ----- | ------ | -------- | -------------------------------- |
 | `url` | string | no       | URL to open (default: blank tab) |
 
-**Result**: `{ targetId, url }` of the new tab.
+**Result**: Text confirmation with target ID and URL
+(e.g. `New tab opened (targetId: ABC123, url: https://example.com)`).
 
 #### `browser_close_tab`
 
@@ -355,12 +343,12 @@ Retrieve console messages from the ring buffer.
 
 **Params**
 
-| Field     | Type    | Default | Description                        |
-| --------- | ------- | ------- | ---------------------------------- |
-| `level`   | enum    | —       | Filter by single level             |
-| `levels`  | enum[]  | —       | Filter by multiple levels          |
-| `sinceMs` | integer | —       | Only messages after this timestamp |
-| `limit`   | integer | `100`   | Max messages to return             |
+| Field     | Type    | Default | Description                                  |
+| --------- | ------- | ------- | -------------------------------------------- |
+| `level`   | enum    | —       | Filter by single level                       |
+| `levels`  | enum[]  | —       | Filter by multiple levels                    |
+| `sinceMs` | integer | —       | Return messages from the last N milliseconds |
+| `limit`   | integer | `100`   | Max messages to return                       |
 
 **Result**: `{ messages, count, total, hasMore }`
 
@@ -370,11 +358,11 @@ Retrieve error-level console messages.
 
 **Params**
 
-| Field             | Type    | Default | Description                         |
-| ----------------- | ------- | ------- | ----------------------------------- |
-| `sinceMs`         | integer | —       | Only errors after this timestamp    |
-| `limit`           | integer | `50`    | Max errors to return                |
-| `includeWarnings` | boolean | `false` | Also include warning-level messages |
+| Field             | Type    | Default | Description                                |
+| ----------------- | ------- | ------- | ------------------------------------------ |
+| `sinceMs`         | integer | —       | Return errors from the last N milliseconds |
+| `limit`           | integer | `50`    | Max errors to return                       |
+| `includeWarnings` | boolean | `false` | Also include warning-level messages        |
 
 **Result**: `{ errors, count, hasMore }` or `"No errors found."`
 
@@ -418,18 +406,20 @@ window size.
 
 ## Browser events
 
-Events are captured from Chrome via CDP and stored in the console buffer for
-poll-based retrieval. The following event types are recorded:
+Events are captured from Chrome via CDP. Only `console_message` events are
+stored in the ring buffer and retrievable via MCP tools (`browser_get_console_logs`,
+`browser_get_errors`). Other events are emitted internally for lifecycle
+management but are not currently exposed to agents.
 
-| Event                  | Source                                             | Description                             |
-| ---------------------- | -------------------------------------------------- | --------------------------------------- |
-| `console_message`      | `Runtime.consoleAPICalled`, `Console.messageAdded` | Console log/warn/error/info/debug       |
-| `network_request`      | `Network.requestWillBeSent`                        | Outgoing HTTP request                   |
-| `network_response`     | `Network.responseReceived`                         | HTTP response received                  |
-| `network_failed`       | `Network.loadingFailed`                            | Network request failure                 |
-| `page_navigated`       | `Page.frameNavigated`                              | Main frame navigation completed         |
-| `browser_connected`    | CDP connect                                        | Successfully (re)connected to Chrome    |
-| `browser_disconnected` | CDP disconnect                                     | Chrome disconnected; reconnect starting |
+| Event                  | Source                                             | Description                             | Buffered |
+| ---------------------- | -------------------------------------------------- | --------------------------------------- | -------- |
+| `console_message`      | `Runtime.consoleAPICalled`, `Console.messageAdded` | Console log/warn/error/info/debug       | yes      |
+| `network_request`      | `Network.requestWillBeSent`                        | Outgoing HTTP request                   | no       |
+| `network_response`     | `Network.responseReceived`                         | HTTP response received                  | no       |
+| `network_failed`       | `Network.loadingFailed`                            | Network request failure                 | no       |
+| `page_navigated`       | `Page.frameNavigated`                              | Main frame navigation completed         | no       |
+| `browser_connected`    | CDP connect                                        | Successfully (re)connected to Chrome    | no       |
+| `browser_disconnected` | CDP disconnect                                     | Chrome disconnected; reconnect starting | no       |
 
 ---
 
@@ -562,7 +552,6 @@ ai-agent-browser/
 | `chrome-remote-interface`   | CDP client                             |
 | `pino`                      | Structured logging                     |
 | `zod`                       | Parameter validation                   |
-| `ajv`                       | JSON schema validation                 |
 
 ---
 
