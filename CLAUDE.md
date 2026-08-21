@@ -19,8 +19,8 @@ This repository publishes to **npmjs** under the `@everydaydevopsio` scope.
 
 - Registry: `https://registry.npmjs.org`
 - Package name: `@everydaydevopsio/pilot`
-- Authentication uses `NODE_AUTH_TOKEN` secret (npmjs automation token)
-- Publish job has `id-token: write` for provenance
+- Authentication uses npm trusted publishing (GitHub OIDC) — no token secret needed
+- Publish job requires `id-token: write` permission for OIDC and provenance
 - Publish with `npm publish --access public --provenance`
 
 ## Installed agent rules
