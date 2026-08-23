@@ -11,3 +11,4 @@ services:
     command: pnpm run test:e2e:mcp:ci
     environment:
       - PILOT_CHROME_PATH=/usr/bin/google-chrome-stable
+      - PILOT_HEADLESS=true

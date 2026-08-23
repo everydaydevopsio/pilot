@@ -128,7 +128,7 @@ const startShape = {
     .boolean()
     .optional()
     .describe(
-      'Run Chrome headless. When omitted, falls back to PILOT_HEADLESS (default: true).'
+      'Run Chrome headless. When omitted, falls back to PILOT_HEADLESS (default: false).'
     ),
   chromePath: z
     .string()

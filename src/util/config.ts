@@ -9,7 +9,7 @@ const ConfigSchema = z.object({
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
     .default('info'),
   chromePath: z.string().optional(),
-  headless: z.boolean().default(true),
+  headless: z.boolean().default(false),
   profileName: z.string().default('profile1'),
   viewport: z.string().default('desktop'),
   responsive: z.boolean().optional()
@@ -44,7 +44,7 @@ export function loadConfig(cliArgs: CliArgs = {}): Config {
     chromePath: process.env.PILOT_CHROME_PATH,
     headless:
       process.env.PILOT_HEADLESS !== undefined
-        ? process.env.PILOT_HEADLESS !== 'false'
+        ? process.env.PILOT_HEADLESS === 'true'
         : undefined,
     profileName: process.env.PILOT_PROFILE_NAME,
     viewport: process.env.PILOT_VIEWPORT,

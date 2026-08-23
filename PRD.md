@@ -464,7 +464,7 @@ All configuration via environment variables. CLI flags are limited to `--version
 | `PILOT_CDP_MAX_RETRY_MS`  | integer (≥1000) | `30000`       | Max CDP reconnect interval (ms)                    |
 | `PILOT_LOG_LEVEL`         | enum            | `info`        | Pino log level (trace/debug/info/warn/error/fatal) |
 | `PILOT_CHROME_PATH`       | string          | auto-detected | Path to Chrome executable                          |
-| `PILOT_HEADLESS`          | boolean         | `true`        | Run Chrome in headless mode                        |
+| `PILOT_HEADLESS`          | boolean         | `false`       | Run Chrome in headless mode                        |
 | `PILOT_CHROME_NO_SANDBOX` | boolean         | `false`       | Disable Chrome sandbox (auto-enabled as root)      |
 | `PILOT_PROFILE_NAME`      | string          | `profile1`    | Chrome profile directory name                      |
 | `PILOT_VIEWPORT`          | string          | `desktop`     | Default viewport preset                            |

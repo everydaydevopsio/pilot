@@ -68,9 +68,9 @@ describe('loadConfig', () => {
     expect(config.profileName).toBe('cli-profile');
   });
 
-  it('headless defaults to true when PILOT_HEADLESS is unset', () => {
+  it('headless defaults to false when PILOT_HEADLESS is unset', () => {
     const config = loadConfig();
-    expect(config.headless).toBe(true);
+    expect(config.headless).toBe(false);
   });
 
   it('PILOT_HEADLESS=false sets headless to false', () => {
