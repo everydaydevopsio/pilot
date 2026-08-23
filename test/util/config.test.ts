@@ -85,6 +85,12 @@ describe('loadConfig', () => {
     expect(config.headless).toBe(true);
   });
 
+  it('PILOT_HEADLESS=1 sets headless to true', () => {
+    process.env.PILOT_HEADLESS = '1';
+    const config = loadConfig();
+    expect(config.headless).toBe(true);
+  });
+
   it('viewport defaults to desktop when PILOT_VIEWPORT is unset', () => {
     const config = loadConfig();
     expect(config.viewport).toBe('desktop');

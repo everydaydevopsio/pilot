@@ -44,7 +44,8 @@ export function loadConfig(cliArgs: CliArgs = {}): Config {
     chromePath: process.env.PILOT_CHROME_PATH,
     headless:
       process.env.PILOT_HEADLESS !== undefined
-        ? process.env.PILOT_HEADLESS === 'true'
+        ? process.env.PILOT_HEADLESS === 'true' ||
+          process.env.PILOT_HEADLESS === '1'
         : undefined,
     profileName: process.env.PILOT_PROFILE_NAME,
     viewport: process.env.PILOT_VIEWPORT,
