@@ -68,9 +68,9 @@ describe('loadConfig', () => {
     expect(config.profileName).toBe('cli-profile');
   });
 
-  it('headless defaults to true when PILOT_HEADLESS is unset', () => {
+  it('headless defaults to false when PILOT_HEADLESS is unset', () => {
     const config = loadConfig();
-    expect(config.headless).toBe(true);
+    expect(config.headless).toBe(false);
   });
 
   it('PILOT_HEADLESS=false sets headless to false', () => {
@@ -83,6 +83,18 @@ describe('loadConfig', () => {
     process.env.PILOT_HEADLESS = 'true';
     const config = loadConfig();
     expect(config.headless).toBe(true);
+  });
+
+  it('PILOT_HEADLESS=1 sets headless to true', () => {
+    process.env.PILOT_HEADLESS = '1';
+    const config = loadConfig();
+    expect(config.headless).toBe(true);
+  });
+
+  it('PILOT_HEADLESS=0 sets headless to false', () => {
+    process.env.PILOT_HEADLESS = '0';
+    const config = loadConfig();
+    expect(config.headless).toBe(false);
   });
 
   it('viewport defaults to desktop when PILOT_VIEWPORT is unset', () => {

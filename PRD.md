@@ -456,20 +456,20 @@ template instructs Claude Code to:
 All configuration via environment variables. CLI flags are limited to `--version`,
 `--help`, and the `init` subcommand.
 
-| Env var                   | Type            | Default       | Description                                        |
-| ------------------------- | --------------- | ------------- | -------------------------------------------------- |
-| `PILOT_CDP_PORT`          | integer         | `9222`        | Chrome DevTools Protocol port                      |
-| `PILOT_CDP_HOST`          | string          | `127.0.0.1`   | CDP host                                           |
-| `PILOT_CDP_RETRY_MS`      | integer (≥100)  | `2000`        | Initial CDP reconnect interval (ms)                |
-| `PILOT_CDP_MAX_RETRY_MS`  | integer (≥1000) | `30000`       | Max CDP reconnect interval (ms)                    |
-| `PILOT_LOG_LEVEL`         | enum            | `info`        | Pino log level (trace/debug/info/warn/error/fatal) |
-| `PILOT_CHROME_PATH`       | string          | auto-detected | Path to Chrome executable                          |
-| `PILOT_HEADLESS`          | boolean         | `true`        | Run Chrome in headless mode                        |
-| `PILOT_CHROME_NO_SANDBOX` | boolean         | `false`       | Disable Chrome sandbox (auto-enabled as root)      |
-| `PILOT_PROFILE_NAME`      | string          | `profile1`    | Chrome profile directory name                      |
-| `PILOT_VIEWPORT`          | string          | `desktop`     | Default viewport preset                            |
-| `PILOT_RESPONSIVE`        | boolean         | —             | Enable responsive mode                             |
-| `PILOT_MCP_BUFFER_SIZE`   | integer         | `1000`        | Console ring buffer size                           |
+| Env var                   | Type            | Default       | Description                                             |
+| ------------------------- | --------------- | ------------- | ------------------------------------------------------- |
+| `PILOT_CDP_PORT`          | integer         | `9222`        | Chrome DevTools Protocol port                           |
+| `PILOT_CDP_HOST`          | string          | `127.0.0.1`   | CDP host                                                |
+| `PILOT_CDP_RETRY_MS`      | integer (≥100)  | `2000`        | Initial CDP reconnect interval (ms)                     |
+| `PILOT_CDP_MAX_RETRY_MS`  | integer (≥1000) | `30000`       | Max CDP reconnect interval (ms)                         |
+| `PILOT_LOG_LEVEL`         | enum            | `info`        | Pino log level (trace/debug/info/warn/error/fatal)      |
+| `PILOT_CHROME_PATH`       | string          | auto-detected | Path to Chrome executable                               |
+| `PILOT_HEADLESS`          | boolean         | `false`       | Run Chrome in headless mode (`true`/`1` or `false`/`0`) |
+| `PILOT_CHROME_NO_SANDBOX` | boolean         | `false`       | Disable Chrome sandbox (auto-enabled as root)           |
+| `PILOT_PROFILE_NAME`      | string          | `profile1`    | Chrome profile directory name                           |
+| `PILOT_VIEWPORT`          | string          | `desktop`     | Default viewport preset                                 |
+| `PILOT_RESPONSIVE`        | boolean         | —             | Enable responsive mode                                  |
+| `PILOT_MCP_BUFFER_SIZE`   | integer         | `1000`        | Console ring buffer size                                |
 
 Chrome path auto-detection checks platform-specific default locations:
 

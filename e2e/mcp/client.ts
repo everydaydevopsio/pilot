@@ -68,7 +68,8 @@ export class McpTestClient {
   }
 
   async startBrowser(
-    headless = process.env.PILOT_HEADLESS === 'false' ? false : true
+    headless = process.env.PILOT_HEADLESS === 'true' ||
+      process.env.PILOT_HEADLESS === '1'
   ): Promise<void> {
     const args: Record<string, unknown> = { headless };
     // PILOT_CHROME_PATH is injected by docker-compose.e2e.yml for the mcp profile
