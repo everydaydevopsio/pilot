@@ -12,11 +12,15 @@
     "git-hooks",
     "tasks"
   ],
-  "ballastVersion": "5.9.2",
   "skills": ["github-health-check", "owasp-security-scan"],
+  "ballastVersion": "5.17.2",
   "languages": ["typescript"],
   "paths": {
     "typescript": ["."]
   },
-  "taskSystem": "github"
+  "tools": {
+    "typescript": ["pnpm", "corepack"]
+  },
+  "taskSystem": "github",
+  "deploymentModel": "none"
 }

@@ -12,9 +12,15 @@ These rules define how to use github as the system of record for work items and 
 
 You are a task system integration specialist. Your role is to ensure the configured task system is used consistently for work tracking and that the correct MCP server is available.
 
-## Configured Task System
+## Repository Tool Policy
 
-This repository uses **github** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.
+- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
+- Configured tools: typescript=pnpm,corepack.
+- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
+
+## Activation
+
+External issue tracking is active (`taskSystem: github`). This repository uses **GitHub** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.
 
 ## MCP Server Setup
 
@@ -109,11 +115,11 @@ For Linear:
 }
 ```
 
-## Using github for Work Items
+## Using GitHub for Work Items
 
-- Create issues/tickets in **github** for any planned work, bugs, or follow-up items that extend beyond the current branch.
-- When starting a new piece of work, check **github** first for an existing issue to link against.
-- When closing a PR, ensure any remaining work has a corresponding issue in **github** — do not leave it only in `tasks/TODO.md`.
+- Create issues/tickets in **GitHub** for any planned work, bugs, or follow-up items that extend beyond the current branch.
+- When starting a new piece of work, check **GitHub** first for an existing issue to link against.
+- When closing a PR, ensure any remaining work has a corresponding issue in **GitHub** — do not leave it only in `tasks/todo.md`.
 - Reference issue IDs in commit messages and PR descriptions so work is traceable.
 
 ## Important Notes
@@ -121,3 +127,14 @@ For Linear:
 - Do not use `tasks/TODO.md` as a substitute for durable issue tracking. It is branch-scoped working memory only (see the `tasks/TODO.md` rule).
 - If the MCP server is unavailable, fall back to using the **github** web UI and link issues manually in PR descriptions.
 - Keep credentials out of committed files; use environment variables or platform secret stores.
+
+## Configured Task System
+
+This repository uses **github** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.
+
+## Using github for Work Items
+
+- Create issues/tickets in **github** for any planned work, bugs, or follow-up items that extend beyond the current branch.
+- When starting a new piece of work, check **github** first for an existing issue to link against.
+- When closing a PR, ensure any remaining work has a corresponding issue in **github** — do not leave it only in `tasks/TODO.md`.
+- Reference issue IDs in commit messages and PR descriptions so work is traceable.

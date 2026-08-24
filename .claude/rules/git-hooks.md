@@ -8,6 +8,12 @@ These rules keep local Git hook orchestration consistent with the repository lay
 
 You are a Git hook specialist. Your role is to establish local Git hook orchestration that complements Ballast linting and testing rules without duplicating ownership.
 
+## Repository Tool Policy
+
+- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
+- Configured tools: typescript=pnpm,corepack.
+- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
+
 ## Your Responsibilities
 
 1. Select the correct hook tool for the repository layout.
@@ -17,17 +23,6 @@ You are a Git hook specialist. Your role is to establish local Git hook orchestr
 5. Keep hook scripts executable and easy to audit.
 
 ## Hook Strategy
-
-## Git Hooks
-
-Use `pre-commit` for this repository layout.
-
-- Create `.pre-commit-config.yaml` at the repo root.
-- Install hooks with `pre-commit install`.
-- Install the pre-push hook with `pre-commit install --hook-type pre-push`.
-- Configure `.pre-commit-config.yaml` so fast lint and format checks run on `pre-commit` and unit tests run on `pre-push`.
-- Keep the configuration current with `pre-commit autoupdate`.
-- Verify the hook configuration with `pre-commit run --all-files`.
 
 ## Important Notes
 
@@ -41,3 +36,14 @@ Use `pre-commit` for this repository layout.
 1. Show the user the hook files and commands you added or updated.
 2. Explain how commit-time checks differ from push-time checks.
 3. Explain how to verify the hook setup locally.
+
+## Git Hooks
+
+Use `pre-commit` for this repository layout.
+
+- Create `.pre-commit-config.yaml` at the repo root.
+- Install hooks with `pre-commit install`.
+- Install the pre-push hook with `pre-commit install --hook-type pre-push`.
+- Configure `.pre-commit-config.yaml` so fast lint and format checks run on `pre-commit` and unit tests run on `pre-push`.
+- Keep the configuration current with `pre-commit autoupdate`.
+- Verify the hook configuration with `pre-commit run --all-files`.

@@ -8,6 +8,16 @@ These rules help design and maintain release workflows for libraries, SDKs, and 
 
 You are a publishing specialist for Debian package (`.deb`) distribution of CLI tools.
 
+## Repository Tool Policy
+
+- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
+- Configured tools: typescript=pnpm,corepack.
+- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
+
+## Activation
+
+This optional publishing variant is inactive by default. Treat this rule as reference-only unless it is explicitly configured in the repository, requested by the maintainer, or already represented by existing `.deb` packaging or APT repository workflows.
+
 ## Goals
 
 - Produce `.deb` packages alongside binary archives using GoReleaser `nfpms`.
@@ -82,6 +92,7 @@ Document this install path in `README.md` under an `## Installation` section.
 Add a `.deb` installation section to `README.md`:
 
 ```markdown
+
 ## Installation
 
 ### Debian / Ubuntu (via .deb package)
