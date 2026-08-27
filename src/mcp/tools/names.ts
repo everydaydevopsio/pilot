@@ -19,7 +19,9 @@ export const EXPECTED_TOOLS = [
   'browser_viewport_resize',
   'browser_get_console_logs',
   'browser_get_errors',
-  'browser_clear_errors'
+  'browser_clear_errors',
+  'browser_snapshot',
+  'browser_find'
 ] as const;
 
 export type ToolName = (typeof EXPECTED_TOOLS)[number];

@@ -1,9 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { BrowserManager } from '../browser.js';
+import { ElementRefMap } from '../browser/inspect/element-ref.js';
 import { loadConfig } from '../util/config.js';
 import { ConsoleBuffer, type ConsoleMessage } from './console-buffer.js';
 import { registerBrowserTools } from './tools/browser.js';
 import { registerErrorTools } from './tools/errors.js';
+import { registerSnapshotTools } from './tools/snapshot.js';
 
 export interface McpConfig {
   bufferSize: number;
@@ -14,6 +16,7 @@ export interface McpConfig {
 export interface BrowserContext {
   manager: BrowserManager | null;
   consoleBuffer: ConsoleBuffer;
+  elementRefMap: ElementRefMap;
   baseConfig: McpConfig;
 }
 
@@ -27,17 +30,22 @@ export async function createMcpServer(config: McpConfig): Promise<{
   });
 
   const consoleBuffer = new ConsoleBuffer(config.bufferSize);
+  const elementRefMap = new ElementRefMap();
 
   const context: BrowserContext = {
     manager: null,
     consoleBuffer,
+    elementRefMap,
     baseConfig: config
   };
 
-  function attachConsoleBuffer(manager: BrowserManager): void {
+  function attachEventHandlers(manager: BrowserManager): void {
     manager.setEventCallback((event, data) => {
       if (event === 'console_message') {
         consoleBuffer.push(data as ConsoleMessage);
+      }
+      if (event === 'page_navigated') {
+        elementRefMap.invalidate();
       }
     });
   }
@@ -48,12 +56,13 @@ export async function createMcpServer(config: McpConfig): Promise<{
       cdpHost: config.cdpHost
     });
     const manager = new BrowserManager(browserConfig);
-    attachConsoleBuffer(manager);
+    attachEventHandlers(manager);
     return manager;
   }
 
   registerBrowserTools(server, context, makeBrowserManager);
   registerErrorTools(server, consoleBuffer);
+  registerSnapshotTools(server, context);
 
   return {
     server,
