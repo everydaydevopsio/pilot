@@ -57,6 +57,10 @@ const navigateShape = {
 };
 
 const clickShape = {
+  ref: z
+    .string()
+    .optional()
+    .describe('Element ref from browser_snapshot (e.g. "e3")'),
   selector: z.string().optional().describe('CSS selector to click'),
   x: z.number().optional().describe('Viewport X coordinate'),
   y: z.number().optional().describe('Viewport Y coordinate'),
@@ -80,6 +84,10 @@ const clickShape = {
 
 const typeShape = {
   text: z.string().describe('Text to type'),
+  ref: z
+    .string()
+    .optional()
+    .describe('Element ref from browser_snapshot (e.g. "e3")'),
   selector: z.string().optional().describe('CSS selector to focus first'),
   clearFirst: z
     .boolean()
@@ -361,10 +369,11 @@ export function registerBrowserTools(
 
   server.tool(
     'browser_click',
-    'Click an element by CSS selector or coordinates. Either selector or x/y coordinates required.',
+    'Click an element by ref (from browser_snapshot), CSS selector, or coordinates.',
     clickShape,
     async (params) => {
       if (
+        params.ref === undefined &&
         params.selector === undefined &&
         (params.x === undefined || params.y === undefined)
       ) {
@@ -372,7 +381,7 @@ export function registerBrowserTools(
           content: [
             {
               type: 'text' as const,
-              text: 'Error: Either selector or x/y coordinates are required'
+              text: 'Error: Either ref, selector, or x/y coordinates are required'
             }
           ],
           isError: true
@@ -380,7 +389,7 @@ export function registerBrowserTools(
       }
 
       const { client } = requireClient(context);
-      const result = await executeClick(client, params);
+      const result = await executeClick(client, params, context.elementRefMap);
 
       return {
         content: [
@@ -395,17 +404,18 @@ export function registerBrowserTools(
 
   server.tool(
     'browser_type',
-    'Type text into the focused element or a specified selector',
+    'Type text into the focused element, a ref (from browser_snapshot), or a CSS selector. Generates keystroke events (use browser_fill to replace a field value entirely).',
     typeShape,
     async (params) => {
       const { client } = requireClient(context);
-      await executeType(client, params);
+      await executeType(client, params, context.elementRefMap);
 
+      const target = params.ref ?? params.selector;
       return {
         content: [
           {
             type: 'text' as const,
-            text: `Typed "${params.text}"${params.selector ? ` into ${params.selector}` : ''}`
+            text: `Typed "${params.text}"${target ? ` into ${target}` : ''}`
           }
         ]
       };

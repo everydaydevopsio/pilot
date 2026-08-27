@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import type { Client } from 'chrome-remote-interface';
+import type { ElementRefMap } from '../browser/inspect/element-ref.js';
+import { resolveRef, focusRef } from '../browser/interaction/ref-resolver.js';
 
 export const TypeParamsSchema = z.object({
   text: z.string(),
+  ref: z.string().optional(),
   selector: z.string().optional(),
   clearFirst: z.boolean().default(false),
   delayMs: z.number().int().min(0).default(0)
@@ -30,9 +33,13 @@ async function focusSelector(client: Client, selector: string): Promise<void> {
 
 export async function executeType(
   client: Client,
-  params: TypeParams
+  params: TypeParams,
+  refMap?: ElementRefMap
 ): Promise<TypeResult> {
-  if (params.selector) {
+  if (params.ref && refMap) {
+    const resolved = await resolveRef(client, refMap, params.ref);
+    await focusRef(client, resolved.backendNodeId);
+  } else if (params.selector) {
     await focusSelector(client, params.selector);
   }
 
