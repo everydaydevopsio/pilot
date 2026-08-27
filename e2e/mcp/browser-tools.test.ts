@@ -292,9 +292,11 @@ describe('MCP E2E: browser control tools', () => {
       expect(mcp.getText(result)).toMatch(/clicked at/i);
     });
 
-    it('returns an error when neither selector nor coordinates are provided', async () => {
+    it('returns an error when neither ref, selector, nor coordinates are provided', async () => {
       const result = await mcp.callTool('browser_click', {});
-      expect(mcp.getText(result)).toMatch(/selector or x\/y/i);
+      expect(mcp.getText(result)).toMatch(
+        /ref.*selector.*x\/y|selector.*x\/y/i
+      );
     });
   });
 });
