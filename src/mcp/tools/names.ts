@@ -21,7 +21,13 @@ export const EXPECTED_TOOLS = [
   'browser_get_errors',
   'browser_clear_errors',
   'browser_snapshot',
-  'browser_find'
+  'browser_find',
+  'browser_fill',
+  'browser_hover',
+  'browser_press_key',
+  'browser_select',
+  'browser_check',
+  'browser_scroll'
 ] as const;
 
 export type ToolName = (typeof EXPECTED_TOOLS)[number];

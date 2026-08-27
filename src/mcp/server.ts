@@ -6,6 +6,7 @@ import { ConsoleBuffer, type ConsoleMessage } from './console-buffer.js';
 import { registerBrowserTools } from './tools/browser.js';
 import { registerErrorTools } from './tools/errors.js';
 import { registerSnapshotTools } from './tools/snapshot.js';
+import { registerInteractionTools } from './tools/interaction.js';
 
 export interface McpConfig {
   bufferSize: number;
@@ -63,6 +64,7 @@ export async function createMcpServer(config: McpConfig): Promise<{
   registerBrowserTools(server, context, makeBrowserManager);
   registerErrorTools(server, consoleBuffer);
   registerSnapshotTools(server, context);
+  registerInteractionTools(server, context);
 
   return {
     server,

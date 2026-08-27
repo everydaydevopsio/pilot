@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import type { Client } from 'chrome-remote-interface';
+import type { ElementRefMap } from '../browser/inspect/element-ref.js';
+import { resolveRef } from '../browser/interaction/ref-resolver.js';
 
 export const ClickParamsSchema = z
   .object({
+    ref: z.string().optional(),
     selector: z.string().optional(),
     x: z.number().optional(),
     y: z.number().optional(),
@@ -11,9 +14,12 @@ export const ClickParamsSchema = z
     timeoutMs: z.number().int().positive().default(5000)
   })
   .refine(
-    (v) => v.selector !== undefined || (v.x !== undefined && v.y !== undefined),
+    (v) =>
+      v.ref !== undefined ||
+      v.selector !== undefined ||
+      (v.x !== undefined && v.y !== undefined),
     {
-      message: 'Either selector or x/y coordinates are required'
+      message: 'Either ref, selector, or x/y coordinates are required'
     }
   );
 
@@ -52,12 +58,20 @@ async function waitForSelector(
 
 export async function executeClick(
   client: Client,
-  params: ClickParams
+  params: ClickParams,
+  refMap?: ElementRefMap
 ): Promise<ClickResult> {
   let x: number;
   let y: number;
 
-  if (params.selector !== undefined) {
+  if (params.ref !== undefined) {
+    if (!refMap) {
+      throw new Error('Element ref map is required when using ref parameter');
+    }
+    const resolved = await resolveRef(client, refMap, params.ref);
+    x = resolved.x;
+    y = resolved.y;
+  } else if (params.selector !== undefined) {
     const pos = await waitForSelector(
       client,
       params.selector,
