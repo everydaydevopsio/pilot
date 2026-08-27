@@ -27,7 +27,7 @@ export async function executeSelect(
 
   await focusRef(client, resolved.backendNodeId);
 
-  const { result } = await client.Runtime.callFunctionOn({
+  const { result, exceptionDetails } = await client.Runtime.callFunctionOn({
     objectId: resolved.objectId,
     functionDeclaration: `function(byValue, byLabel, byIndex) {
       if (this.tagName.toLowerCase() !== 'select') {
@@ -61,8 +61,12 @@ export async function executeSelect(
     awaitPromise: false
   });
 
-  if (result.subtype === 'error' || result.className === 'Error') {
-    throw new Error(result.description ?? 'Failed to select option');
+  if (exceptionDetails) {
+    throw new Error(
+      exceptionDetails.exception?.description ??
+        exceptionDetails.text ??
+        'Failed to select option'
+    );
   }
 
   const selected = result.value as { value: string; label: string };

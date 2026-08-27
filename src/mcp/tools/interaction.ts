@@ -201,6 +201,22 @@ export function registerInteractionTools(
     'Scroll the page or an element. Use ref to scroll an element into view, direction/amount for relative scrolling, or x/y for absolute scroll position.',
     scrollShape,
     async (params) => {
+      if (
+        params.ref === undefined &&
+        params.direction === undefined &&
+        params.x === undefined &&
+        params.y === undefined
+      ) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: 'Error: At least one of ref, direction, or x/y is required'
+            }
+          ],
+          isError: true
+        };
+      }
       const { client, refMap } = requireContext(context);
       const result = await executeScroll(client, refMap, params);
       return {

@@ -64,7 +64,10 @@ export async function executeClick(
   let x: number;
   let y: number;
 
-  if (params.ref !== undefined && refMap) {
+  if (params.ref !== undefined) {
+    if (!refMap) {
+      throw new Error('Element ref map is required when using ref parameter');
+    }
     const resolved = await resolveRef(client, refMap, params.ref);
     x = resolved.x;
     y = resolved.y;

@@ -24,7 +24,7 @@ export async function executeCheck(
 ): Promise<CheckResult> {
   const resolved = await resolveRef(client, refMap, params.ref);
 
-  const { result } = await client.Runtime.callFunctionOn({
+  const { result, exceptionDetails } = await client.Runtime.callFunctionOn({
     objectId: resolved.objectId,
     functionDeclaration: `function(desiredState) {
       var tag = this.tagName.toLowerCase();
@@ -44,8 +44,12 @@ export async function executeCheck(
     awaitPromise: false
   });
 
-  if (result.subtype === 'error' || result.className === 'Error') {
-    throw new Error(result.description ?? 'Failed to toggle checkbox');
+  if (exceptionDetails) {
+    throw new Error(
+      exceptionDetails.exception?.description ??
+        exceptionDetails.text ??
+        'Failed to toggle checkbox'
+    );
   }
 
   return {

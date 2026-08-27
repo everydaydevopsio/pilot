@@ -36,7 +36,10 @@ export async function executeType(
   params: TypeParams,
   refMap?: ElementRefMap
 ): Promise<TypeResult> {
-  if (params.ref && refMap) {
+  if (params.ref) {
+    if (!refMap) {
+      throw new Error('Element ref map is required when using ref parameter');
+    }
     const resolved = await resolveRef(client, refMap, params.ref);
     await focusRef(client, resolved.backendNodeId);
   } else if (params.selector) {

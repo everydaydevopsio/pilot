@@ -4,7 +4,6 @@ import { resolveRef } from '../browser/interaction/ref-resolver.js';
 
 export interface HoverParams {
   ref?: string;
-  selector?: string;
   x?: number;
   y?: number;
 }
