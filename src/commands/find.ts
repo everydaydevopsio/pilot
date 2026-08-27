@@ -23,15 +23,16 @@ export async function executeFind(
   refMap: ElementRefMap,
   query: FindQuery
 ): Promise<FindCommandResult> {
-  // Build a fresh snapshot (or reuse if we already have one for this generation)
+  // Always builds a fresh snapshot — no caching across calls
   const snapshot = await buildSnapshot(client, refMap);
   const matched = findElements(snapshot, query);
 
   if (matched.length === 0) {
-    const queryDesc = Object.entries(query)
+    const queryParts = Object.entries(query)
       .filter(([, v]) => v !== undefined)
-      .map(([k, v]) => `${k}="${v}"`)
-      .join(', ');
+      .map(([k, v]) => `${k}="${v}"`);
+    const queryDesc =
+      queryParts.length > 0 ? queryParts.join(', ') : 'the given query';
     return {
       text: `No elements found matching ${queryDesc}.`,
       elements: []

@@ -13,6 +13,19 @@ export class ElementRefMap {
     return this.generation;
   }
 
+  /**
+   * Clear refs for a new snapshot within the same document.
+   * Does not increment generation.
+   */
+  resetRefs(): void {
+    this.refs.clear();
+    this.counter = 0;
+  }
+
+  /**
+   * Invalidate all refs due to navigation or DOM replacement.
+   * Increments generation so stale refs are detected.
+   */
   invalidate(): void {
     this.refs.clear();
     this.counter = 0;

@@ -29,9 +29,6 @@ function requireContext(context: BrowserContext) {
     throw new Error('Browser not started. Call browser_start first.');
   }
   const client = manager.getClient()!;
-  if (!context.elementRefMap) {
-    throw new Error('Element ref map not initialized.');
-  }
   return { client, refMap: context.elementRefMap };
 }
 
@@ -41,7 +38,7 @@ export function registerSnapshotTools(
 ): void {
   server.tool(
     'browser_snapshot',
-    'Capture a structured accessibility snapshot of the current page. Returns interactive and meaningful elements with short refs (e1, e2, ...) that can be used with browser_click, browser_fill, and other interaction tools instead of CSS selectors.',
+    'Capture a structured accessibility snapshot of the current page. Returns interactive and meaningful elements with short refs (e1, e2, ...) that can be used with browser_click and other interaction tools instead of CSS selectors.',
     {},
     async () => {
       const { client, refMap } = requireContext(context);

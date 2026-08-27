@@ -161,8 +161,9 @@ export async function buildSnapshot(
 ): Promise<SnapshotResult> {
   const logger = getLogger();
 
-  // Invalidate old refs and start fresh
-  refMap.invalidate();
+  // Clear refs for the new snapshot without incrementing generation.
+  // Generation only advances on navigation (via invalidate()).
+  refMap.resetRefs();
 
   // Enable required domains
   await Promise.all([client.Accessibility.enable(), client.DOM.enable({})]);
@@ -191,23 +192,37 @@ export async function buildSnapshot(
     'Building snapshot'
   );
 
-  // Build element info for each candidate
+  // Build element info for each candidate.
+  // Assign refs first, then fetch DOM details in parallel per node.
+  const validCandidates = candidates.filter((n) => n.backendDOMNodeId);
+  const refs = validCandidates.map((axNode) => {
+    const ref = refMap.nextRef();
+    refMap.set(ref, axNode.backendDOMNodeId!);
+    return ref;
+  });
+
+  const domDetails = await Promise.all(
+    validCandidates.map(async (axNode) => {
+      const id = axNode.backendDOMNodeId!;
+      const [tagInfo, bounds] = await Promise.all([
+        getNodeTag(client, id),
+        getBoxModelSafe(client, id)
+      ]);
+      return { tagInfo, bounds };
+    })
+  );
+
   const elements: ElementInfo[] = [];
 
-  for (const axNode of candidates) {
-    if (!axNode.backendDOMNodeId) continue;
-
-    const ref = refMap.nextRef();
-    refMap.set(ref, axNode.backendDOMNodeId);
+  for (let i = 0; i < validCandidates.length; i++) {
+    const axNode = validCandidates[i];
+    const ref = refs[i];
+    const { tagInfo, bounds } = domDetails[i];
 
     const role = axNode.role?.value ?? '';
     const name = axNode.name?.value ?? '';
 
-    // Get DOM tag and input type
-    const { tag, type } = await getNodeTag(client, axNode.backendDOMNodeId);
-
-    // Get bounds
-    const bounds = await getBoxModelSafe(client, axNode.backendDOMNodeId);
+    const { tag, type } = tagInfo;
 
     // Extract properties
     const checked = getAXProperty(axNode, 'checked');

@@ -79,4 +79,31 @@ describe('ElementRefMap', () => {
     refMap.invalidate();
     expect(refMap.getGeneration()).toBe(3);
   });
+
+  it('resetRefs clears refs and counter without incrementing generation', () => {
+    refMap.set(refMap.nextRef(), 1);
+    refMap.set(refMap.nextRef(), 2);
+    expect(refMap.size()).toBe(2);
+    expect(refMap.getGeneration()).toBe(0);
+
+    refMap.resetRefs();
+
+    expect(refMap.size()).toBe(0);
+    expect(refMap.getGeneration()).toBe(0);
+    expect(refMap.nextRef()).toBe('e1');
+  });
+
+  it('resetRefs does not make old refs stale if not re-added', () => {
+    const ref = refMap.nextRef();
+    refMap.set(ref, 42);
+    refMap.resetRefs();
+
+    try {
+      refMap.resolve(ref);
+      fail('Expected error');
+    } catch (err: unknown) {
+      const e = err as Error & { code: string };
+      expect(e.code).toBe('STALE_ELEMENT_REFERENCE');
+    }
+  });
 });
