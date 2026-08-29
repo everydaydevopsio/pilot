@@ -56,18 +56,23 @@ const errorsShape = {
     .describe('Include warnings in addition to errors')
 };
 
+// CDP line/column numbers are 0-based; convert to 1-based for display
+function line1(n: number): number {
+  return n + 1;
+}
+
 function formatMessage(msg: ConsoleMessage): string {
   const parts = [`[${msg.level.toUpperCase()}] ${msg.text}`];
   if (msg.url) {
-    parts.push(
-      `  at ${msg.url}:${msg.lineNumber}${msg.columnNumber !== undefined ? `:${msg.columnNumber}` : ''}`
-    );
+    const col =
+      msg.columnNumber !== undefined ? `:${line1(msg.columnNumber)}` : '';
+    parts.push(`  at ${msg.url}:${line1(msg.lineNumber)}${col}`);
   }
   if (msg.stackFrames && msg.stackFrames.length > 0) {
     for (const frame of msg.stackFrames) {
       const fn = frame.functionName || '<anonymous>';
       parts.push(
-        `    at ${fn} (${frame.url}:${frame.lineNumber}:${frame.columnNumber})`
+        `    at ${fn} (${frame.url}:${line1(frame.lineNumber)}:${line1(frame.columnNumber)})`
       );
     }
   }
@@ -103,7 +108,6 @@ export function registerRuntimeTools(
       }
 
       const messages = buffer.getAll({ level: filterLevels, sinceMs, limit });
-      const total = buffer.size();
 
       if (messages.length === 0) {
         return {
@@ -112,7 +116,7 @@ export function registerRuntimeTools(
       }
 
       const formatted = messages.map(formatMessage).join('\n\n');
-      const header = `Console messages (${messages.length}${total > messages.length ? ` of ${total}` : ''}):\n`;
+      const header = `Console messages (${messages.length}):\n`;
 
       return {
         content: [{ type: 'text' as const, text: header + formatted }]

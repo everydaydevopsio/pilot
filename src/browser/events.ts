@@ -59,12 +59,13 @@ export function attachEventListeners(
       columnNumber: f.columnNumber
     }));
 
+    const topFrame = frames?.[0];
     opts.emit('console_message', {
       level: 'error',
       text: message,
-      url: ex.url ?? frames?.[0]?.url ?? '',
-      lineNumber: ex.lineNumber ?? 0,
-      columnNumber: ex.columnNumber,
+      url: ex.url ?? topFrame?.url ?? '',
+      lineNumber: ex.lineNumber ?? topFrame?.lineNumber ?? 0,
+      columnNumber: ex.columnNumber ?? topFrame?.columnNumber,
       timestamp: Date.now(),
       stackFrames: frames,
       isException: true
