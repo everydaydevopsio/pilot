@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { BrowserManager } from '../browser.js';
 import { ElementRefMap } from '../browser/inspect/element-ref.js';
+import { resetCssState } from '../browser/inspect/styles.js';
 import { NetworkBuffer } from '../browser/network/network-buffer.js';
 import { attachNetworkMonitor } from '../browser/network/network-monitor.js';
 import { loadConfig } from '../util/config.js';
@@ -11,6 +12,7 @@ import { registerSnapshotTools } from './tools/snapshot.js';
 import { registerInteractionTools } from './tools/interaction.js';
 import { registerNetworkTools } from './tools/network.js';
 import { registerRuntimeTools } from './tools/runtime.js';
+import { registerStylesTools } from './tools/styles.js';
 
 export interface McpConfig {
   bufferSize: number;
@@ -70,6 +72,7 @@ export async function createMcpServer(config: McpConfig): Promise<{
       }
       if (event === 'browser_disconnected') {
         monitoredClient = null;
+        resetCssState();
       }
       // Reattach after tab switch (new client, no connect event)
       ensureNetworkMonitor();
@@ -92,6 +95,7 @@ export async function createMcpServer(config: McpConfig): Promise<{
   registerInteractionTools(server, context);
   registerNetworkTools(server, context);
   registerRuntimeTools(server, consoleBuffer);
+  registerStylesTools(server, context);
 
   return {
     server,
