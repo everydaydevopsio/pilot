@@ -21,6 +21,8 @@ import { registerNetworkTools } from './tools/network.js';
 import { registerRuntimeTools } from './tools/runtime.js';
 import { registerStylesTools } from './tools/styles.js';
 import { registerFilesTools } from './tools/files.js';
+import { createTraceState } from '../browser/performance/trace.js';
+import { registerPerformanceTools } from './tools/performance.js';
 
 export interface McpConfig {
   bufferSize: number;
@@ -35,6 +37,7 @@ export interface BrowserContext {
   networkBuffer: NetworkBuffer;
   dialogQueue: DialogQueue;
   downloadTracker: DownloadTracker;
+  traceState: ReturnType<typeof createTraceState>;
   baseConfig: McpConfig;
 }
 
@@ -52,6 +55,7 @@ export async function createMcpServer(config: McpConfig): Promise<{
   const networkBuffer = new NetworkBuffer();
   const dialogQueue = new DialogQueue();
   const downloadTracker = new DownloadTracker();
+  const traceState = createTraceState();
 
   const context: BrowserContext = {
     manager: null,
@@ -60,6 +64,7 @@ export async function createMcpServer(config: McpConfig): Promise<{
     networkBuffer,
     dialogQueue,
     downloadTracker,
+    traceState,
     baseConfig: config
   };
 
@@ -118,6 +123,7 @@ export async function createMcpServer(config: McpConfig): Promise<{
   registerRuntimeTools(server, consoleBuffer);
   registerStylesTools(server, context);
   registerFilesTools(server, context);
+  registerPerformanceTools(server, context);
 
   return {
     server,
