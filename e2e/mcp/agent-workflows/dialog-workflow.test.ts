@@ -3,9 +3,8 @@ import { McpTestClient } from '../client.js';
 /**
  * Agent workflow: Dialog handling
  *
- * Navigate to a page with an alert dialog, detect it, and accept it.
- * (Replaces upload/download test since those require filesystem fixtures
- * that are hard to set up in the Docker E2E environment.)
+ * Trigger an alert dialog via evaluate (setTimeout to avoid blocking CDP),
+ * detect it, and accept it.
  */
 describe('Agent Workflow: Dialog Handling', () => {
   let mcp: McpTestClient;
@@ -24,20 +23,15 @@ describe('Agent Workflow: Dialog Handling', () => {
   it('detects and accepts a dialog', async () => {
     const page = `data:text/html,<html><body>
       <h1>Dialog Test</h1>
-      <button onclick="alert('Action completed!')">Trigger Alert</button>
     </body></html>`;
 
     await mcp.callTool('browser_navigate', { url: page });
 
-    // Find and click the button to trigger the alert
-    const btnResult = await mcp.callTool('browser_find', {
-      role: 'button',
-      name: 'Trigger Alert'
+    // Trigger alert asynchronously so CDP isn't blocked
+    await mcp.callTool('browser_evaluate', {
+      expression: "setTimeout(() => alert('Action completed!'), 100)",
+      awaitPromise: false
     });
-    const btnRef = mcp.getText(btnResult).match(/\[(e\d+)\]/)?.[1];
-    expect(btnRef).toBeDefined();
-
-    await mcp.callTool('browser_click', { ref: btnRef! });
     await new Promise((r) => setTimeout(r, 500));
 
     // List pending dialogs
