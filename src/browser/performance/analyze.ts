@@ -21,21 +21,38 @@ interface TraceEvent {
   args?: Record<string, unknown>;
 }
 
+function findNavigationStart(events: TraceEvent[]): number {
+  for (const event of events) {
+    if (event.name === 'navigationStart' && event.ts) {
+      return event.ts;
+    }
+  }
+  // Fallback: earliest timestamp in the trace
+  let earliest = Infinity;
+  for (const event of events) {
+    if (event.ts && event.ts < earliest) {
+      earliest = event.ts;
+    }
+  }
+  return earliest === Infinity ? 0 : earliest;
+}
+
 function extractNavigationTiming(events: TraceEvent[]): NavigationTiming {
   const timing: NavigationTiming = {};
+  const baseTs = findNavigationStart(events);
 
   for (const event of events) {
-    if (event.name === 'domContentLoadedEventEnd' && event.ts) {
-      timing.domContentLoaded = event.ts / 1000;
+    if (event.name === 'domContentLoadedEventEnd' && event.ts !== undefined) {
+      timing.domContentLoaded = (event.ts - baseTs) / 1000;
     }
-    if (event.name === 'loadEventEnd' && event.ts) {
-      timing.load = event.ts / 1000;
+    if (event.name === 'loadEventEnd' && event.ts !== undefined) {
+      timing.load = (event.ts - baseTs) / 1000;
     }
-    if (event.name === 'firstPaint' && event.ts) {
-      timing.firstPaint = event.ts / 1000;
+    if (event.name === 'firstPaint' && event.ts !== undefined) {
+      timing.firstPaint = (event.ts - baseTs) / 1000;
     }
-    if (event.name === 'firstContentfulPaint' && event.ts) {
-      timing.firstContentfulPaint = event.ts / 1000;
+    if (event.name === 'firstContentfulPaint' && event.ts !== undefined) {
+      timing.firstContentfulPaint = (event.ts - baseTs) / 1000;
     }
   }
 
@@ -107,8 +124,19 @@ function extractSlowRequests(events: TraceEvent[]): SlowRequest[] {
 }
 
 function extractLargeResources(events: TraceEvent[]): LargeResource[] {
-  const resources: LargeResource[] = [];
+  // Build a requestId → URL map from ResourceSendRequest events
+  const urlMap = new Map<string, string>();
+  for (const event of events) {
+    if (event.name === 'ResourceSendRequest' && event.args) {
+      const data = event.args.data as
+        { requestId?: string; url?: string } | undefined;
+      if (data?.requestId && data.url) {
+        urlMap.set(data.requestId, data.url);
+      }
+    }
+  }
 
+  const resources: LargeResource[] = [];
   for (const event of events) {
     if (event.name === 'ResourceFinish' && event.args) {
       const data = event.args.data as
@@ -118,7 +146,7 @@ function extractLargeResources(events: TraceEvent[]): LargeResource[] {
         data.decodedBodyLength > LARGE_RESOURCE_THRESHOLD_BYTES
       ) {
         resources.push({
-          url: '',
+          url: (data.requestId && urlMap.get(data.requestId)) || '',
           size: data.decodedBodyLength
         });
       }
@@ -165,23 +193,23 @@ export async function analyzePerformance(
 export function formatPerformanceSummary(summary: PerformanceSummary): string {
   const lines: string[] = ['Performance Summary:\n'];
 
-  // Navigation timing
+  // Navigation timing — use explicit undefined checks so 0ms values are shown
   const nt = summary.navigationTiming;
   lines.push('Navigation Timing:');
-  if (nt.domContentLoaded)
+  if (nt.domContentLoaded !== undefined)
     lines.push(`  DOMContentLoaded: ${Math.round(nt.domContentLoaded)}ms`);
-  if (nt.load) lines.push(`  Load: ${Math.round(nt.load)}ms`);
-  if (nt.firstPaint)
+  if (nt.load !== undefined) lines.push(`  Load: ${Math.round(nt.load)}ms`);
+  if (nt.firstPaint !== undefined)
     lines.push(`  First Paint: ${Math.round(nt.firstPaint)}ms`);
-  if (nt.firstContentfulPaint)
+  if (nt.firstContentfulPaint !== undefined)
     lines.push(
       `  First Contentful Paint: ${Math.round(nt.firstContentfulPaint)}ms`
     );
   if (
-    !nt.domContentLoaded &&
-    !nt.load &&
-    !nt.firstPaint &&
-    !nt.firstContentfulPaint
+    nt.domContentLoaded === undefined &&
+    nt.load === undefined &&
+    nt.firstPaint === undefined &&
+    nt.firstContentfulPaint === undefined
   ) {
     lines.push('  (no timing data captured)');
   }

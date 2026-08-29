@@ -5,10 +5,11 @@ const MAX_TRACE_EVENTS = 100000;
 export interface TraceState {
   tracing: boolean;
   events: unknown[];
+  listenerClient: WeakRef<Client> | null;
 }
 
 export function createTraceState(): TraceState {
-  return { tracing: false, events: [] };
+  return { tracing: false, events: [], listenerClient: null };
 }
 
 export async function startTrace(
@@ -22,12 +23,15 @@ export async function startTrace(
   state.events = [];
   state.tracing = true;
 
-  // Collect trace events as they arrive
-  client.Tracing.dataCollected((params) => {
-    if (state.events.length < MAX_TRACE_EVENTS) {
-      state.events.push(...params.value);
-    }
-  });
+  // Only attach listener if not already attached to this client
+  if (state.listenerClient?.deref() !== client) {
+    client.Tracing.dataCollected((params) => {
+      if (state.events.length < MAX_TRACE_EVENTS) {
+        state.events.push(...params.value);
+      }
+    });
+    state.listenerClient = new WeakRef(client);
+  }
 
   await client.Tracing.start({
     categories:
