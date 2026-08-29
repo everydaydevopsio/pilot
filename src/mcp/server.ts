@@ -92,6 +92,8 @@ export async function createMcpServer(config: McpConfig): Promise<{
       if (event === 'browser_disconnected') {
         monitoredClient = null;
         resetCssState();
+        dialogQueue.clear();
+        downloadTracker.clear();
       }
       // Reattach after tab switch (new client, no connect event)
       ensureMonitors();

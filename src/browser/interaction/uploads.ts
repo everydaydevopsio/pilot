@@ -7,14 +7,21 @@ const DEFAULT_UPLOAD_ROOTS = [process.cwd()];
 function getUploadRoots(): string[] {
   const env = process.env.PILOT_UPLOAD_ROOTS;
   if (env) {
-    return env.split(',').map((p) => resolve(p.trim()));
+    return env
+      .split(',')
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0)
+      .map((p) => resolve(p));
   }
   return DEFAULT_UPLOAD_ROOTS;
 }
 
 function isUnderAllowedRoot(filePath: string, roots: string[]): boolean {
   const resolved = realpathSync(filePath);
-  return roots.some((root) => resolved.startsWith(root));
+  // Use path separator boundary to prevent "/allowed" matching "/allowed_evil"
+  return roots.some(
+    (root) => resolved === root || resolved.startsWith(root + '/')
+  );
 }
 
 export function validateUploadFiles(files: string[]): void {

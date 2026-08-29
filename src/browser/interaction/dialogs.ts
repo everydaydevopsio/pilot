@@ -36,7 +36,7 @@ export function attachDialogHandler(client: Client, queue: DialogQueue): void {
     queue.push({
       type: params.type,
       message: params.message,
-      defaultPrompt: params.defaultPrompt || undefined,
+      defaultPrompt: params.defaultPrompt ?? undefined,
       timestamp: Date.now()
     });
   });

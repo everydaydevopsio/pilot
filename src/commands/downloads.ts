@@ -98,7 +98,9 @@ export function formatDownloadsResult(result: DownloadsResult): string {
 
   if (result.action === 'wait' && result.download) {
     const d = result.download;
-    return `Download complete: ${d.filename} (${d.receivedBytes} bytes, ${d.state})`;
+    const label =
+      d.state === 'completed' ? 'Download complete' : `Download ${d.state}`;
+    return `${label}: ${d.filename} (${d.receivedBytes} bytes)`;
   }
 
   if (result.action === 'clear') {
