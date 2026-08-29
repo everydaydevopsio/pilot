@@ -73,18 +73,17 @@ export interface StylesResult {
   boxModel?: BoxModelInfo;
 }
 
-let cssEnabled = false;
+let cssEnabledFor: WeakRef<Client> | null = null;
 
 async function ensureCssEnabled(client: Client): Promise<void> {
-  if (!cssEnabled) {
-    await client.CSS.enable();
-    cssEnabled = true;
-  }
+  if (cssEnabledFor?.deref() === client) return;
+  await client.CSS.enable();
+  cssEnabledFor = new WeakRef(client);
 }
 
 // Reset CSS enabled state (for reconnection)
 export function resetCssState(): void {
-  cssEnabled = false;
+  cssEnabledFor = null;
 }
 
 function parseQuad(quad: number[]): {
@@ -207,9 +206,11 @@ export async function getStyles(
 export function formatStyles(result: StylesResult): string {
   const lines: string[] = [`Styles for ${result.ref}:\n`];
 
-  // Computed styles
+  // Computed styles (sorted for stable output)
   lines.push('Computed:');
-  const entries = Object.entries(result.computed);
+  const entries = Object.entries(result.computed).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
   if (entries.length === 0) {
     lines.push('  (none)');
   } else {
@@ -244,7 +245,10 @@ export function formatStyles(result: StylesResult): string {
     lines.push('Matched Rules:');
     for (const rule of result.matched) {
       lines.push(`  ${rule.selector} (${rule.source}):`);
-      for (const [name, value] of Object.entries(rule.properties)) {
+      const sortedProps = Object.entries(rule.properties).sort(([a], [b]) =>
+        a.localeCompare(b)
+      );
+      for (const [name, value] of sortedProps) {
         lines.push(`    ${name}: ${value}`);
       }
     }
