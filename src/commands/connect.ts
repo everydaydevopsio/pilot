@@ -4,7 +4,6 @@ import type { TabInfo } from '../browser/types.js';
 export interface ConnectParams {
   host?: string;
   port?: number;
-  wsUrl?: string;
 }
 
 export interface ConnectResult {
@@ -20,11 +19,7 @@ export async function executeConnect(
   const host = params.host ?? '127.0.0.1';
   const port = params.port ?? 9222;
 
-  const { tabs } = await manager.connectExisting({
-    host,
-    port,
-    wsUrl: params.wsUrl
-  });
+  const { tabs } = await manager.connectExisting({ host, port });
 
   return { host, port, tabs };
 }

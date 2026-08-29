@@ -259,7 +259,6 @@ export class BrowserManager {
   async connectExisting(opts: {
     host?: string;
     port?: number;
-    wsUrl?: string;
   }): Promise<{ tabs: TabInfo[] }> {
     if (this.chromeProcess) {
       throw new Error(

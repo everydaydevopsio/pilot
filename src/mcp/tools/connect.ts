@@ -15,11 +15,7 @@ const connectShape = {
     .min(1)
     .max(65535)
     .default(9222)
-    .describe('Chrome debugging port (default: 9222)'),
-  wsUrl: z
-    .string()
-    .optional()
-    .describe('WebSocket URL for direct CDP connection (overrides host/port)')
+    .describe('Chrome debugging port (default: 9222)')
 };
 
 export function registerConnectTools(
@@ -31,7 +27,7 @@ export function registerConnectTools(
     'browser_connect',
     'Connect to an existing Chrome instance with remote debugging enabled. Start Chrome with --remote-debugging-port=PORT, then use this tool to connect. Lists available tabs after connecting. Use browser_switch_tab to select a specific tab.',
     connectShape,
-    async ({ host, port, wsUrl }) => {
+    async ({ host, port }) => {
       if (context.manager?.isConnected()) {
         return {
           content: [
@@ -49,12 +45,18 @@ export function registerConnectTools(
       }
 
       const manager = makeBrowserManager();
-      const result = await executeConnect(manager, { host, port, wsUrl });
-      context.manager = manager;
-
-      return {
-        content: [{ type: 'text' as const, text: formatConnectResult(result) }]
-      };
+      try {
+        const result = await executeConnect(manager, { host, port });
+        context.manager = manager;
+        return {
+          content: [
+            { type: 'text' as const, text: formatConnectResult(result) }
+          ]
+        };
+      } catch (err) {
+        await manager.destroy();
+        throw err;
+      }
     }
   );
 }
