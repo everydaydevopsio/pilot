@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Client } from 'chrome-remote-interface';
 import type { BrowserManager } from '../browser.js';
+import { checkOrigin } from '../browser/security/origins.js';
 
 export const NavigateParamsSchema = z.object({
   url: z.string().url(),
@@ -22,6 +23,14 @@ export async function executeNavigate(
   manager: BrowserManager,
   params: NavigateParams
 ): Promise<NavigateResult> {
+  // Check origin policy before navigation
+  const originCheck = checkOrigin(params.url);
+  if (!originCheck.allowed) {
+    throw new Error(
+      originCheck.reason ?? 'Navigation blocked by origin policy'
+    );
+  }
+
   let finalStatus = 200;
 
   const navigationPromise = new Promise<{ url: string; status: number }>(
@@ -97,6 +106,17 @@ export async function executeNavigate(
 
   try {
     const result = await navigationPromise;
+
+    // Check final URL after redirects — block if redirected to a blocked origin
+    const finalCheck = checkOrigin(result.url);
+    if (!finalCheck.allowed) {
+      // Navigate away from the blocked origin
+      await client.Page.navigate({ url: 'about:blank' });
+      throw new Error(
+        `Redirect landed on blocked origin: ${finalCheck.reason}`
+      );
+    }
+
     return result;
   } finally {
     // Event listeners are auto-removed when client disconnects;
