@@ -1,11 +1,21 @@
 export type ConsoleLevel = 'log' | 'warn' | 'error' | 'info' | 'debug';
 
+export interface StackFrame {
+  url: string;
+  functionName: string;
+  lineNumber: number;
+  columnNumber: number;
+}
+
 export interface ConsoleMessage {
   level: ConsoleLevel;
   text: string;
   url: string;
   lineNumber: number;
+  columnNumber?: number;
   timestamp: number;
+  stackFrames?: StackFrame[];
+  isException?: boolean;
 }
 
 export interface ConsoleFilter {

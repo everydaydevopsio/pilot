@@ -10,6 +10,7 @@ import { registerErrorTools } from './tools/errors.js';
 import { registerSnapshotTools } from './tools/snapshot.js';
 import { registerInteractionTools } from './tools/interaction.js';
 import { registerNetworkTools } from './tools/network.js';
+import { registerRuntimeTools } from './tools/runtime.js';
 
 export interface McpConfig {
   bufferSize: number;
@@ -90,6 +91,7 @@ export async function createMcpServer(config: McpConfig): Promise<{
   registerSnapshotTools(server, context);
   registerInteractionTools(server, context);
   registerNetworkTools(server, context);
+  registerRuntimeTools(server, consoleBuffer);
 
   return {
     server,
