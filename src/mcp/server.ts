@@ -1,12 +1,15 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { BrowserManager } from '../browser.js';
 import { ElementRefMap } from '../browser/inspect/element-ref.js';
+import { NetworkBuffer } from '../browser/network/network-buffer.js';
+import { attachNetworkMonitor } from '../browser/network/network-monitor.js';
 import { loadConfig } from '../util/config.js';
 import { ConsoleBuffer, type ConsoleMessage } from './console-buffer.js';
 import { registerBrowserTools } from './tools/browser.js';
 import { registerErrorTools } from './tools/errors.js';
 import { registerSnapshotTools } from './tools/snapshot.js';
 import { registerInteractionTools } from './tools/interaction.js';
+import { registerNetworkTools } from './tools/network.js';
 
 export interface McpConfig {
   bufferSize: number;
@@ -18,6 +21,7 @@ export interface BrowserContext {
   manager: BrowserManager | null;
   consoleBuffer: ConsoleBuffer;
   elementRefMap: ElementRefMap;
+  networkBuffer: NetworkBuffer;
   baseConfig: McpConfig;
 }
 
@@ -32,15 +36,27 @@ export async function createMcpServer(config: McpConfig): Promise<{
 
   const consoleBuffer = new ConsoleBuffer(config.bufferSize);
   const elementRefMap = new ElementRefMap();
+  const networkBuffer = new NetworkBuffer();
 
   const context: BrowserContext = {
     manager: null,
     consoleBuffer,
     elementRefMap,
+    networkBuffer,
     baseConfig: config
   };
 
   function attachEventHandlers(manager: BrowserManager): void {
+    let monitoredClient: unknown = null;
+
+    function ensureNetworkMonitor(): void {
+      const client = manager.getClient();
+      if (client && client !== monitoredClient) {
+        attachNetworkMonitor(client, networkBuffer);
+        monitoredClient = client;
+      }
+    }
+
     manager.setEventCallback((event, data) => {
       if (event === 'console_message') {
         consoleBuffer.push(data as ConsoleMessage);
@@ -48,6 +64,14 @@ export async function createMcpServer(config: McpConfig): Promise<{
       if (event === 'page_navigated') {
         elementRefMap.invalidate();
       }
+      if (event === 'browser_connected') {
+        ensureNetworkMonitor();
+      }
+      if (event === 'browser_disconnected') {
+        monitoredClient = null;
+      }
+      // Reattach after tab switch (new client, no connect event)
+      ensureNetworkMonitor();
     });
   }
 
@@ -65,6 +89,7 @@ export async function createMcpServer(config: McpConfig): Promise<{
   registerErrorTools(server, consoleBuffer);
   registerSnapshotTools(server, context);
   registerInteractionTools(server, context);
+  registerNetworkTools(server, context);
 
   return {
     server,
