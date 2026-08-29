@@ -7,9 +7,9 @@
 [![GitHub Release](https://img.shields.io/github/v/release/everydaydevopsio/pilot)](https://github.com/everydaydevopsio/pilot/releases)
 [![npm version](https://img.shields.io/npm/v/@everydaydevopsio/pilot.svg)](https://www.npmjs.com/package/@everydaydevopsio/pilot)
 
-A lightweight Node.js/TypeScript MCP server that gives AI agents DevTools-grade control over a running Chrome instance. Connects to Chrome via the Chrome DevTools Protocol (CDP) and exposes MCP tools for screenshots, navigation, clicks, typing, JavaScript evaluation, and live console/network event monitoring.
+A lightweight Node.js/TypeScript MCP server that gives AI agents DevTools-grade control over a running Chrome instance. Connects to Chrome via the Chrome DevTools Protocol (CDP) and exposes 35 MCP tools for browser automation, inspection, and debugging — including structured accessibility snapshots, element ref-based interaction, network/console/CSS inspection, file operations, performance tracing, and security controls.
 
-Use pilot to open a URL and watch for errors — from any AI agent that speaks MCP.
+Use pilot to open a URL, interact with it using semantic element refs, inspect network traffic, diagnose CSS issues, and watch for errors — all from any AI agent that speaks MCP.
 
 ## Prerequisites
 
@@ -94,31 +94,86 @@ Or add to `.mcp.json` in your project:
 
 **Browser Lifecycle:**
 
-| Tool            | Description   |
-| --------------- | ------------- |
-| `browser_start` | Launch Chrome |
-| `browser_stop`  | Stop Chrome   |
+| Tool              | Description                                         |
+| ----------------- | --------------------------------------------------- |
+| `browser_start`   | Launch Chrome                                       |
+| `browser_stop`    | Stop Chrome (or disconnect from external Chrome)    |
+| `browser_connect` | Connect to an existing Chrome with remote debugging |
 
-**Browser Control:**
+**Snapshot & Find:**
 
-| Tool                      | Description                                      |
-| ------------------------- | ------------------------------------------------ |
-| `browser_screenshot`      | Capture viewport or full page screenshot         |
-| `browser_navigate`        | Navigate to URL and wait for load                |
-| `browser_click`           | Click element by CSS selector or coordinates     |
-| `browser_type`            | Type text into focused element or selector       |
-| `browser_evaluate`        | Execute JavaScript and return result             |
-| `browser_wait`            | Wait for selector, network idle, or fixed delay  |
-| `browser_page_info`       | Get current URL, title, and ready state          |
-| `browser_viewport_resize` | Resize the viewport to new dimensions at runtime |
+| Tool               | Description                                            |
+| ------------------ | ------------------------------------------------------ |
+| `browser_snapshot` | Accessibility snapshot with element refs (e1, e2, ...) |
+| `browser_find`     | Find elements by role, name, or text                   |
 
-**Error Monitoring:**
+**Interaction (ref-based):**
+
+| Tool                | Description                                         |
+| ------------------- | --------------------------------------------------- |
+| `browser_click`     | Click by ref, CSS selector, or coordinates          |
+| `browser_type`      | Type text into ref, selector, or focused element    |
+| `browser_fill`      | Replace field value (React/Vue/Svelte compatible)   |
+| `browser_hover`     | Hover over element by ref or coordinates            |
+| `browser_press_key` | Press key or combo (Enter, Tab, Control+a, etc.)    |
+| `browser_select`    | Select option by value, label, or index             |
+| `browser_check`     | Toggle checkbox/radio                               |
+| `browser_scroll`    | Scroll element into view, by direction, or absolute |
+
+**Inspection:**
+
+| Tool                      | Description                                       |
+| ------------------------- | ------------------------------------------------- |
+| `browser_screenshot`      | Capture viewport or full page screenshot          |
+| `browser_navigate`        | Navigate to URL (with origin security check)      |
+| `browser_evaluate`        | Execute JavaScript and return result              |
+| `browser_wait`            | Wait for selector, network idle, or fixed delay   |
+| `browser_page_info`       | Get current URL, title, and ready state           |
+| `browser_viewport_resize` | Resize the viewport to new dimensions             |
+| `browser_styles`          | Inspect computed styles, CSS rules, and box model |
+
+**Network & Console:**
+
+| Tool              | Description                                   |
+| ----------------- | --------------------------------------------- |
+| `browser_network` | List/get/clear captured network requests      |
+| `browser_console` | List/clear console messages with stack traces |
+| `browser_errors`  | List/clear runtime errors and exceptions      |
+
+**Files & Dialogs:**
+
+| Tool                | Description                            |
+| ------------------- | -------------------------------------- |
+| `browser_dialog`    | Handle alert/confirm/prompt dialogs    |
+| `browser_upload`    | Upload files to file input elements    |
+| `browser_downloads` | Track file downloads (list/wait/clear) |
+
+**Performance:**
+
+| Tool                  | Description                                                              |
+| --------------------- | ------------------------------------------------------------------------ |
+| `browser_performance` | Start/stop tracing; analyze navigation timing, long tasks, slow requests |
+
+**Tab Management:**
+
+| Tool           | Description                               |
+| -------------- | ----------------------------------------- |
+| `browser_tabs` | List/new/select/close tabs (consolidated) |
+
+<details>
+<summary>Legacy tools (backward compatible)</summary>
 
 | Tool                       | Description                                  |
 | -------------------------- | -------------------------------------------- |
+| `browser_list_tabs`        | List all open tabs                           |
+| `browser_new_tab`          | Open a new tab                               |
+| `browser_close_tab`        | Close a tab                                  |
+| `browser_switch_tab`       | Switch to a tab                              |
 | `browser_get_console_logs` | Get buffered console messages with filters   |
 | `browser_get_errors`       | Get console errors (and optionally warnings) |
 | `browser_clear_errors`     | Clear the console message buffer             |
+
+</details>
 
 ## Configuration
 
@@ -135,6 +190,11 @@ All configuration via environment variables.
 | `PILOT_PROFILE_NAME`      | `profile1`  | Persistent browser profile name. Profiles are stored under `$XDG_DATA_HOME/pilot/<name>` (default `~/.local/share/pilot/<name>`).                                                                                                                                    |
 | `PILOT_RESPONSIVE`        | (preset)    | Responsive viewport mode. When `true`, the page uses real window dimensions and reflows on resize. Desktop presets default to `true`; mobile/tablet presets leave this unset (locked viewport). Set to `false` to lock the viewport with `setDeviceMetricsOverride`. |
 | `PILOT_CHROME_NO_SANDBOX` | (auto)      | Force `--no-sandbox` on/off. Accepts `true`/`1` or `false`/`0`. When unset, the flag is auto-applied only when running as root on Linux. See [Chrome sandbox](#chrome-sandbox) below.                                                                                |
+| `PILOT_ALLOWED_ORIGINS`   | (none)      | Comma-separated origin allow list. Supports wildcards (`*.example.com`). When set, only matching origins can be navigated to.                                                                                                                                        |
+| `PILOT_BLOCKED_ORIGINS`   | (none)      | Comma-separated origin block list. Block wins over allow. Supports wildcards.                                                                                                                                                                                        |
+| `PILOT_REDACT_HEADERS`    | (defaults)  | Additional headers to redact in network inspection. Default: Authorization, Cookie, Set-Cookie, X-Api-Key, Proxy-Authorization.                                                                                                                                      |
+| `PILOT_UPLOAD_ROOTS`      | (cwd)       | Comma-separated allowed directories for file uploads.                                                                                                                                                                                                                |
+| `PILOT_DOWNLOAD_DIR`      | (OS temp)   | Directory for tracked downloads.                                                                                                                                                                                                                                     |
 
 > **Tip — running headless:** By default Chrome opens a visible browser window. To run headless (no visible window), set `PILOT_HEADLESS=true` or ask the AI agent: _"set headless to true"_ (or _"run Chrome headless"_). The agent will set `PILOT_HEADLESS=true` before calling `browser_start`.
 
@@ -189,28 +249,23 @@ pnpm run test:e2e:mcp:docker
 
 ```
 src/
-├── browser.ts         # CDP connection + reconnect logic
-├── cli/               # CLI commands
-│   ├── init.ts        # Init command (creates skill)
-│   └── skill-template.ts  # SKILL.md template
-├── commands/          # CDP command implementations
-│   ├── screenshot.ts
-│   ├── navigate.ts
-│   ├── click.ts
-│   ├── type.ts
-│   ├── evaluate.ts
-│   ├── wait.ts
-│   └── page_info.ts
-├── mcp/               # MCP server (sole entry point)
-│   ├── index.ts       # Entry point (stdio)
-│   ├── server.ts      # MCP server setup
-│   ├── console-buffer.ts  # Console message buffer
-│   └── tools/
-│       ├── browser.ts # Browser control tools
-│       └── errors.ts  # Error monitoring tools
-└── util/
-    ├── config.ts      # Configuration loading
-    └── logger.ts      # Pino logger setup
+├── browser.ts              # Backward-compatible re-export barrel
+├── browser/                # Core browser modules
+│   ├── browser-manager.ts  # BrowserManager orchestrator
+│   ├── chrome-launcher.ts  # Chrome process management
+│   ├── connection.ts       # CDP connection + reconnect
+│   ├── events.ts           # CDP event listeners
+│   ├── tabs.ts             # Tab management
+│   ├── types.ts            # Shared types
+│   ├── inspect/            # Snapshot, styles, element refs
+│   ├── interaction/        # Dialogs, uploads, downloads, ref resolver
+│   ├── network/            # Network buffer, monitor, header redaction
+│   ├── performance/        # Tracing + analysis
+│   └── security/           # Origin allow/block lists
+├── cli/                    # CLI commands (init)
+├── commands/               # Tool command implementations
+├── mcp/                    # MCP server + tool registrations
+└── util/                   # Config, logger
 ```
 
 ## Claude Code Skill
