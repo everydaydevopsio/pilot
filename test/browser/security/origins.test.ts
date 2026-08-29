@@ -113,4 +113,26 @@ describe('checkOrigin', () => {
     delete process.env.PILOT_ALLOWED_ORIGINS;
     expect(checkOrigin('https://evil.com').allowed).toBe(false);
   });
+
+  it('scheme-less pattern matches host against any scheme', () => {
+    process.env.PILOT_BLOCKED_ORIGINS = '*.evil.com';
+    delete process.env.PILOT_ALLOWED_ORIGINS;
+    expect(checkOrigin('https://sub.evil.com').allowed).toBe(false);
+    expect(checkOrigin('http://sub.evil.com').allowed).toBe(false);
+  });
+
+  it('scheme-less allow pattern matches host only', () => {
+    delete process.env.PILOT_BLOCKED_ORIGINS;
+    process.env.PILOT_ALLOWED_ORIGINS = '*.myapp.com';
+    expect(checkOrigin('https://staging.myapp.com').allowed).toBe(true);
+    expect(checkOrigin('http://staging.myapp.com').allowed).toBe(true);
+    expect(checkOrigin('https://other.com').allowed).toBe(false);
+  });
+
+  it('scheme-less pattern with port matches host:port', () => {
+    process.env.PILOT_BLOCKED_ORIGINS = 'localhost:3000';
+    delete process.env.PILOT_ALLOWED_ORIGINS;
+    expect(checkOrigin('http://localhost:3000/api').allowed).toBe(false);
+    expect(checkOrigin('http://localhost:4000/api').allowed).toBe(true);
+  });
 });

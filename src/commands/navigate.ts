@@ -106,6 +106,17 @@ export async function executeNavigate(
 
   try {
     const result = await navigationPromise;
+
+    // Check final URL after redirects — block if redirected to a blocked origin
+    const finalCheck = checkOrigin(result.url);
+    if (!finalCheck.allowed) {
+      // Navigate away from the blocked origin
+      await client.Page.navigate({ url: 'about:blank' });
+      throw new Error(
+        `Redirect landed on blocked origin: ${finalCheck.reason}`
+      );
+    }
+
     return result;
   } finally {
     // Event listeners are auto-removed when client disconnects;
