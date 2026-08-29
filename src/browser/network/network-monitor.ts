@@ -1,6 +1,6 @@
 import type { Client } from 'chrome-remote-interface';
 import type { NetworkRecord } from './types.js';
-import { NetworkBuffer } from './network-buffer.js';
+import type { NetworkBuffer } from './network-buffer.js';
 
 /**
  * Parse CDP headers object to a flat Record.

@@ -47,7 +47,15 @@ export async function createMcpServer(config: McpConfig): Promise<{
   };
 
   function attachEventHandlers(manager: BrowserManager): void {
-    let networkMonitorAttached = false;
+    let monitoredClient: unknown = null;
+
+    function ensureNetworkMonitor(): void {
+      const client = manager.getClient();
+      if (client && client !== monitoredClient) {
+        attachNetworkMonitor(client, networkBuffer);
+        monitoredClient = client;
+      }
+    }
 
     manager.setEventCallback((event, data) => {
       if (event === 'console_message') {
@@ -56,16 +64,14 @@ export async function createMcpServer(config: McpConfig): Promise<{
       if (event === 'page_navigated') {
         elementRefMap.invalidate();
       }
-      if (event === 'browser_connected' && !networkMonitorAttached) {
-        const client = manager.getClient();
-        if (client) {
-          attachNetworkMonitor(client, networkBuffer);
-          networkMonitorAttached = true;
-        }
+      if (event === 'browser_connected') {
+        ensureNetworkMonitor();
       }
       if (event === 'browser_disconnected') {
-        networkMonitorAttached = false;
+        monitoredClient = null;
       }
+      // Reattach after tab switch (new client, no connect event)
+      ensureNetworkMonitor();
     });
   }
 

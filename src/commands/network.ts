@@ -6,7 +6,6 @@ import type {
   NetworkFilter
 } from '../browser/network/types.js';
 import { getResponseBody } from '../browser/network/network-monitor.js';
-import { redactHeaders } from '../browser/network/redaction.js';
 
 export type NetworkAction = 'list' | 'get' | 'clear';
 
@@ -73,10 +72,9 @@ export async function executeNetwork(
       }
       // Lazily fetch response body
       const bodyResult = await getResponseBody(client, params.requestId);
+      // record headers are already redacted by getDetail()
       const detail: NetworkDetail = {
         ...record,
-        requestHeaders: redactHeaders(record.requestHeaders),
-        responseHeaders: redactHeaders(record.responseHeaders),
         ...(bodyResult && {
           responseBody: bodyResult.body,
           bodyTruncated: bodyResult.truncated
