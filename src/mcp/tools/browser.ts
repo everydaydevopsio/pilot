@@ -198,6 +198,24 @@ const switchTabShape = {
   targetId: z.string().describe('Target ID of the tab to switch to')
 };
 
+const tabsShape = {
+  action: z
+    .enum(['list', 'new', 'select', 'close'])
+    .describe(
+      'Action: list tabs, open new tab, select/switch tab, or close tab'
+    ),
+  targetId: z
+    .string()
+    .optional()
+    .describe('Target ID (required for select and close actions)'),
+  url: z
+    .string()
+    .optional()
+    .describe(
+      'URL to open in the new tab (new action only, opens blank tab if omitted)'
+    )
+};
+
 const viewportResizeShape = {
   width: z.number().int().positive().describe('New viewport width in pixels'),
   height: z.number().int().positive().describe('New viewport height in pixels'),
@@ -610,6 +628,84 @@ export function registerBrowserTools(
           }
         ]
       };
+    }
+  );
+
+  server.tool(
+    'browser_tabs',
+    'Manage browser tabs. Actions: "list" shows all tabs, "new" opens a tab (optional url), "select" switches to a tab (requires targetId), "close" closes a tab (requires targetId).',
+    tabsShape,
+    async ({ action, targetId, url }) => {
+      const { manager } = requireClient(context);
+
+      switch (action) {
+        case 'list': {
+          const tabs = await executeListTabs(manager);
+          return {
+            content: [
+              { type: 'text' as const, text: JSON.stringify(tabs, null, 2) }
+            ]
+          };
+        }
+
+        case 'new': {
+          const result = await executeNewTab(manager, url);
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `New tab opened (targetId: ${result.targetId}, url: ${result.url})`
+              }
+            ]
+          };
+        }
+
+        case 'select': {
+          if (!targetId) {
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: 'Error: targetId is required for select action'
+                }
+              ],
+              isError: true
+            };
+          }
+          await executeSwitchTab(manager, targetId);
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `Switched to tab ${targetId}.`
+              }
+            ]
+          };
+        }
+
+        case 'close': {
+          if (!targetId) {
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: 'Error: targetId is required for close action'
+                }
+              ],
+              isError: true
+            };
+          }
+          await executeCloseTab(manager, targetId);
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `Tab ${targetId} closed.`
+              }
+            ]
+          };
+        }
+      }
     }
   );
 }
