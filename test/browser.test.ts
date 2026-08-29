@@ -17,6 +17,7 @@ function makeMockClient() {
     close: jest.fn().mockResolvedValue(undefined),
     Runtime: {
       consoleAPICalled: jest.fn(),
+      exceptionThrown: jest.fn(),
       enable: jest.fn().mockResolvedValue(undefined)
     },
     Console: {
@@ -86,6 +87,7 @@ describe('BrowserManager', () => {
       on: jest.fn(),
       Runtime: {
         consoleAPICalled: jest.fn(),
+        exceptionThrown: jest.fn(),
         enable: jest.fn().mockResolvedValue(undefined)
       },
       Console: {

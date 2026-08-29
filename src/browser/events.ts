@@ -48,6 +48,29 @@ export function attachEventListeners(
     });
   });
 
+  // Runtime exceptions
+  client.Runtime.exceptionThrown((params) => {
+    const ex = params.exceptionDetails;
+    const message = ex.exception?.description ?? ex.text ?? 'Unknown exception';
+    const frames = ex.stackTrace?.callFrames?.map((f) => ({
+      url: f.url,
+      functionName: f.functionName,
+      lineNumber: f.lineNumber,
+      columnNumber: f.columnNumber
+    }));
+
+    opts.emit('console_message', {
+      level: 'error',
+      text: message,
+      url: ex.url ?? frames?.[0]?.url ?? '',
+      lineNumber: ex.lineNumber ?? 0,
+      columnNumber: ex.columnNumber,
+      timestamp: Date.now(),
+      stackFrames: frames,
+      isException: true
+    });
+  });
+
   // Network events
   client.Network.requestWillBeSent((params) => {
     opts.pendingNetworkRequests.add(params.requestId);
