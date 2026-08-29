@@ -50,6 +50,9 @@ export class BrowserManager {
   private launchedCdpPort: number | null = null;
   private viewportConfig: ViewportConfig | null = null;
   private launchedUserDataDir: string | null = null;
+  private external = false;
+  private externalHost: string | null = null;
+  private externalPort: number | null = null;
 
   constructor(private readonly config: Config) {
     this.retryMs = config.cdpRetryMs;
@@ -82,6 +85,10 @@ export class BrowserManager {
 
   isLaunched(): boolean {
     return this.chromeProcess !== null;
+  }
+
+  isExternalChrome(): boolean {
+    return this.external;
   }
 
   getViewportConfig(): ViewportConfig | null {
@@ -249,6 +256,67 @@ export class BrowserManager {
     }
   }
 
+  async connectExisting(opts: {
+    host?: string;
+    port?: number;
+    wsUrl?: string;
+  }): Promise<{ tabs: TabInfo[] }> {
+    if (this.chromeProcess) {
+      throw new Error(
+        'Chrome was launched by Pilot. Use browser_stop first, then browser_connect.'
+      );
+    }
+    if (this.destroyed) {
+      throw new Error(
+        'BrowserManager has been destroyed; create a new instance'
+      );
+    }
+
+    const logger = getLogger();
+    const host = opts.host ?? '127.0.0.1';
+    const port = opts.port ?? 9222;
+
+    this.external = true;
+    this.externalHost = host;
+    this.externalPort = port;
+    this.launchedCdpPort = port;
+
+    // Override connection info for external Chrome
+    const connInfo: ConnectionInfo = { host, port };
+
+    try {
+      const { client, targetId, url } = await connectToChrome(connInfo);
+
+      this.client = client;
+      this.targetId = targetId;
+      this.currentUrl = url;
+      this.retryMs = this.config.cdpRetryMs;
+
+      await enableDomains(client, this.viewportConfig);
+      attachEventListeners(client, this.makeEventListenerOpts());
+
+      logger.info(
+        { host, port, targetId, url },
+        'Connected to existing Chrome'
+      );
+
+      this.emit('browser_connected', { targetId, url });
+
+      const tabs = await this.listTabs();
+      return { tabs };
+    } catch (cause) {
+      this.external = false;
+      this.externalHost = null;
+      this.externalPort = null;
+      this.launchedCdpPort = null;
+      throw new Error(
+        `Could not connect to Chrome at ${host}:${port}. ` +
+          `Start Chrome with --remote-debugging-port=${port} or use browser_start to launch a new instance.`,
+        { cause }
+      );
+    }
+  }
+
   private checkNetworkIdle(): void {
     if (this.pendingNetworkRequests.size === 0) {
       if (this.networkIdleTimer) clearTimeout(this.networkIdleTimer);
@@ -348,6 +416,14 @@ export class BrowserManager {
     if (this.client) {
       await this.client.close();
       this.client = null;
+    }
+    // External Chrome: just disconnect, don't kill the process
+    if (this.external) {
+      this.external = false;
+      this.externalHost = null;
+      this.externalPort = null;
+      this.launchedCdpPort = null;
+      return;
     }
     if (this.chromeProcess) {
       const proc = this.chromeProcess;

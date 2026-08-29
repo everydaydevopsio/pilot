@@ -23,6 +23,7 @@ import { registerStylesTools } from './tools/styles.js';
 import { registerFilesTools } from './tools/files.js';
 import { createTraceState } from '../browser/performance/trace.js';
 import { registerPerformanceTools } from './tools/performance.js';
+import { registerConnectTools } from './tools/connect.js';
 
 export interface McpConfig {
   bufferSize: number;
@@ -124,6 +125,7 @@ export async function createMcpServer(config: McpConfig): Promise<{
   registerStylesTools(server, context);
   registerFilesTools(server, context);
   registerPerformanceTools(server, context);
+  registerConnectTools(server, context, makeBrowserManager);
 
   return {
     server,
