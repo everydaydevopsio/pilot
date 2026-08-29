@@ -27,7 +27,8 @@ export const EXPECTED_TOOLS = [
   'browser_press_key',
   'browser_select',
   'browser_check',
-  'browser_scroll'
+  'browser_scroll',
+  'browser_network'
 ] as const;
 
 export type ToolName = (typeof EXPECTED_TOOLS)[number];

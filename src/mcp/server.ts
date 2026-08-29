@@ -1,12 +1,15 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { BrowserManager } from '../browser.js';
 import { ElementRefMap } from '../browser/inspect/element-ref.js';
+import { NetworkBuffer } from '../browser/network/network-buffer.js';
+import { attachNetworkMonitor } from '../browser/network/network-monitor.js';
 import { loadConfig } from '../util/config.js';
 import { ConsoleBuffer, type ConsoleMessage } from './console-buffer.js';
 import { registerBrowserTools } from './tools/browser.js';
 import { registerErrorTools } from './tools/errors.js';
 import { registerSnapshotTools } from './tools/snapshot.js';
 import { registerInteractionTools } from './tools/interaction.js';
+import { registerNetworkTools } from './tools/network.js';
 
 export interface McpConfig {
   bufferSize: number;
@@ -18,6 +21,7 @@ export interface BrowserContext {
   manager: BrowserManager | null;
   consoleBuffer: ConsoleBuffer;
   elementRefMap: ElementRefMap;
+  networkBuffer: NetworkBuffer;
   baseConfig: McpConfig;
 }
 
@@ -32,21 +36,35 @@ export async function createMcpServer(config: McpConfig): Promise<{
 
   const consoleBuffer = new ConsoleBuffer(config.bufferSize);
   const elementRefMap = new ElementRefMap();
+  const networkBuffer = new NetworkBuffer();
 
   const context: BrowserContext = {
     manager: null,
     consoleBuffer,
     elementRefMap,
+    networkBuffer,
     baseConfig: config
   };
 
   function attachEventHandlers(manager: BrowserManager): void {
+    let networkMonitorAttached = false;
+
     manager.setEventCallback((event, data) => {
       if (event === 'console_message') {
         consoleBuffer.push(data as ConsoleMessage);
       }
       if (event === 'page_navigated') {
         elementRefMap.invalidate();
+      }
+      if (event === 'browser_connected' && !networkMonitorAttached) {
+        const client = manager.getClient();
+        if (client) {
+          attachNetworkMonitor(client, networkBuffer);
+          networkMonitorAttached = true;
+        }
+      }
+      if (event === 'browser_disconnected') {
+        networkMonitorAttached = false;
       }
     });
   }
@@ -65,6 +83,7 @@ export async function createMcpServer(config: McpConfig): Promise<{
   registerErrorTools(server, consoleBuffer);
   registerSnapshotTools(server, context);
   registerInteractionTools(server, context);
+  registerNetworkTools(server, context);
 
   return {
     server,
