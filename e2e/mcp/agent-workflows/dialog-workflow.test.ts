@@ -1,4 +1,5 @@
 import { McpTestClient } from '../client.js';
+import { dataUrl } from './helpers.js';
 
 /**
  * Agent workflow: Dialog handling
@@ -21,9 +22,7 @@ describe('Agent Workflow: Dialog Handling', () => {
   });
 
   it('detects and accepts a dialog', async () => {
-    const page = `data:text/html,<html><body>
-      <h1>Dialog Test</h1>
-    </body></html>`;
+    const page = dataUrl(`<html><body><h1>Dialog Test</h1></body></html>`);
 
     await mcp.callTool('browser_navigate', { url: page });
 

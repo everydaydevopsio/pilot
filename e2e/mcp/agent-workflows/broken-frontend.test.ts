@@ -1,4 +1,5 @@
 import { McpTestClient } from '../client.js';
+import { dataUrl } from './helpers.js';
 
 /**
  * Agent workflow: Broken Frontend
@@ -21,37 +22,29 @@ describe('Agent Workflow: Broken Frontend', () => {
   });
 
   it('detects JavaScript errors via browser_errors', async () => {
-    // Navigate to a page that throws an error
-    const page = `data:text/html,<html><body>
+    const page = dataUrl(`<html><body>
       <h1>Broken App</h1>
-      <script>
-        undefinedFunction();
-      </script>
-    </body></html>`;
+      <script>undefinedFunction();</script>
+    </body></html>`);
 
     await mcp.callTool('browser_navigate', { url: page });
-
-    // Wait for error to be captured
     await new Promise((r) => setTimeout(r, 500));
 
-    // Check for errors
     const errResult = await mcp.callTool('browser_errors', { action: 'list' });
     const errText = mcp.getText(errResult);
     expect(errText).toContain('undefinedFunction');
   });
 
   it('captures console.error messages via browser_console', async () => {
-    const page = `data:text/html,<html><body>
+    const page = dataUrl(`<html><body>
       <h1>App with Console Errors</h1>
       <script>
         console.error('Database connection failed');
         console.warn('Cache miss on key: user_123');
       </script>
-    </body></html>`;
+    </body></html>`);
 
-    // Clear previous messages
     await mcp.callTool('browser_console', { action: 'clear' });
-
     await mcp.callTool('browser_navigate', { url: page });
     await new Promise((r) => setTimeout(r, 500));
 

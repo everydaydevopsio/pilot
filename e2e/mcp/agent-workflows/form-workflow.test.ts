@@ -1,4 +1,5 @@
 import { McpTestClient } from '../client.js';
+import { dataUrl } from './helpers.js';
 
 /**
  * Agent workflow: Form
@@ -21,7 +22,7 @@ describe('Agent Workflow: Form', () => {
   });
 
   it('fills and submits a form using only refs', async () => {
-    const page = `data:text/html,<html><body>
+    const html = `<html><body>
       <h1>Contact Form</h1>
       <form id="contact">
         <label>Name <input type="text" name="name" /></label>
@@ -49,7 +50,7 @@ describe('Agent Workflow: Form', () => {
       </script>
     </body></html>`;
 
-    await mcp.callTool('browser_navigate', { url: page });
+    await mcp.callTool('browser_navigate', { url: dataUrl(html) });
 
     // Take a snapshot
     const snapResult = await mcp.callTool('browser_snapshot');
@@ -62,8 +63,7 @@ describe('Agent Workflow: Form', () => {
       role: 'textbox',
       name: 'Name'
     });
-    const nameText = mcp.getText(nameResult);
-    const nameRef = nameText.match(/\[(e\d+)\]/)?.[1];
+    const nameRef = mcp.getText(nameResult).match(/\[(e\d+)\]/)?.[1];
     expect(nameRef).toBeDefined();
 
     // Find the email field
@@ -71,15 +71,11 @@ describe('Agent Workflow: Form', () => {
       role: 'textbox',
       name: 'Email'
     });
-    const emailText = mcp.getText(emailResult);
-    const emailRef = emailText.match(/\[(e\d+)\]/)?.[1];
+    const emailRef = mcp.getText(emailResult).match(/\[(e\d+)\]/)?.[1];
     expect(emailRef).toBeDefined();
 
     // Fill fields using refs
-    await mcp.callTool('browser_fill', {
-      ref: nameRef!,
-      value: 'Jane Doe'
-    });
+    await mcp.callTool('browser_fill', { ref: nameRef!, value: 'Jane Doe' });
     await mcp.callTool('browser_fill', {
       ref: emailRef!,
       value: 'jane@example.com'
@@ -90,35 +86,26 @@ describe('Agent Workflow: Form', () => {
       role: 'combobox',
       name: 'Country'
     });
-    const countryText = mcp.getText(countryResult);
-    const countryRef = countryText.match(/\[(e\d+)\]/)?.[1];
+    const countryRef = mcp.getText(countryResult).match(/\[(e\d+)\]/)?.[1];
     expect(countryRef).toBeDefined();
 
-    await mcp.callTool('browser_select', {
-      ref: countryRef!,
-      value: 'ca'
-    });
+    await mcp.callTool('browser_select', { ref: countryRef!, value: 'ca' });
 
     // Find and check the agree checkbox
     const checkResult = await mcp.callTool('browser_find', {
       role: 'checkbox'
     });
-    const checkText = mcp.getText(checkResult);
-    const checkRef = checkText.match(/\[(e\d+)\]/)?.[1];
+    const checkRef = mcp.getText(checkResult).match(/\[(e\d+)\]/)?.[1];
     expect(checkRef).toBeDefined();
 
-    await mcp.callTool('browser_check', {
-      ref: checkRef!,
-      checked: true
-    });
+    await mcp.callTool('browser_check', { ref: checkRef!, checked: true });
 
     // Find and click the submit button
     const btnResult = await mcp.callTool('browser_find', {
       role: 'button',
       name: 'Submit'
     });
-    const btnText = mcp.getText(btnResult);
-    const btnRef = btnText.match(/\[(e\d+)\]/)?.[1];
+    const btnRef = mcp.getText(btnResult).match(/\[(e\d+)\]/)?.[1];
     expect(btnRef).toBeDefined();
 
     await mcp.callTool('browser_click', { ref: btnRef! });

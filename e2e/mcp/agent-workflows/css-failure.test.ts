@@ -1,4 +1,5 @@
 import { McpTestClient } from '../client.js';
+import { dataUrl } from './helpers.js';
 
 /**
  * Agent workflow: CSS Failure
@@ -21,15 +22,14 @@ describe('Agent Workflow: CSS Failure', () => {
   });
 
   it('diagnoses a hidden element via browser_styles', async () => {
-    const page = `data:text/html,<html><body>
+    const page = dataUrl(`<html><body>
       <h1>Dashboard</h1>
       <button id="visible-btn">Save</button>
       <button id="hidden-btn" style="display: none;">Delete</button>
-    </body></html>`;
+    </body></html>`);
 
     await mcp.callTool('browser_navigate', { url: page });
 
-    // Snapshot — the hidden button may appear but marked as not visible
     const snapResult = await mcp.callTool('browser_snapshot');
     const snapText = mcp.getText(snapResult);
     expect(snapText).toContain('Save');
@@ -47,7 +47,6 @@ describe('Agent Workflow: CSS Failure', () => {
       properties: ['display', 'visibility', 'opacity']
     });
     const saveStylesText = mcp.getText(saveStyles);
-    // Save button should be visible
     expect(saveStylesText).not.toContain('display: none');
   });
 });
