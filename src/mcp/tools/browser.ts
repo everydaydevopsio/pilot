@@ -211,7 +211,9 @@ const tabsShape = {
   url: z
     .string()
     .optional()
-    .describe('URL for new tab (new action only, blank if omitted)')
+    .describe(
+      'URL to open in the new tab (new action only, opens blank tab if omitted)'
+    )
 };
 
 const viewportResizeShape = {
