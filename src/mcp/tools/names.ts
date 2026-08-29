@@ -31,7 +31,10 @@ export const EXPECTED_TOOLS = [
   'browser_network',
   'browser_console',
   'browser_errors',
-  'browser_styles'
+  'browser_styles',
+  'browser_dialog',
+  'browser_upload',
+  'browser_downloads'
 ] as const;
 
 export type ToolName = (typeof EXPECTED_TOOLS)[number];
