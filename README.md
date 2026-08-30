@@ -100,8 +100,9 @@ args = ["-y", "@everydaydevopsio/pilot"]
 ```
 
 Project-scoped config is loaded only after you trust the project in Codex. Commit
-`.codex/config.toml` if everyone working in the repo should get the same MCP
-server definition.
+`.codex/config.toml` only when it is portable for all contributors, such as the
+`npx` example above. Keep local-build configs with absolute paths in your user
+config or an uncommitted local override.
 
 ### Local build
 
@@ -120,6 +121,9 @@ Or use the equivalent project-scoped config:
 command = "node"
 args = ["/path/to/pilot/dist/mcp/index.js"]
 ```
+
+Do not commit project-scoped local-build configs with absolute paths; they are
+machine-specific.
 
 ## Claude Code Integration
 
