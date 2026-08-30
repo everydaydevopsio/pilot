@@ -179,7 +179,7 @@ export async function findFreePort(): Promise<number> {
 
 export async function waitForChromeReady(
   port: number,
-  timeoutMs = 10000
+  timeoutMs = 30000
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {

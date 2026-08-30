@@ -180,6 +180,14 @@ const startShape = {
     .optional()
     .describe(
       'Responsive mode. When true, the page uses real window dimensions and reflows on resize (like a normal browser). Desktop presets default to true; mobile/tablet presets leave this unset (locked viewport). Set to false to lock the viewport with setDeviceMetricsOverride.'
+    ),
+  startupTimeoutMs: z
+    .number()
+    .int()
+    .positive()
+    .default(30000)
+    .describe(
+      'Timeout waiting for Chrome DevTools to become ready, in milliseconds.'
     )
 };
 
@@ -263,7 +271,8 @@ export function registerBrowserTools(
       viewportWidth,
       viewportHeight,
       deviceScaleFactor,
-      responsive
+      responsive,
+      startupTimeoutMs
     }) => {
       if (context.manager?.isConnected()) {
         return {
@@ -291,7 +300,8 @@ export function registerBrowserTools(
           viewportWidth,
           viewportHeight,
           deviceScaleFactor,
-          responsive
+          responsive,
+          startupTimeoutMs
         });
       context.manager = manager;
 
