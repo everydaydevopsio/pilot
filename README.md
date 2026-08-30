@@ -64,6 +64,63 @@ docker build -t pilot .
 claude mcp add pilot -- docker run -i --rm pilot
 ```
 
+## Codex Integration
+
+Codex reads MCP server configuration from `config.toml`. Use
+`~/.codex/config.toml` for a user-level install that follows you across repos,
+or `.codex/config.toml` for a project-level install that applies when Codex is
+started from this trusted repo.
+
+### User-level install
+
+Add pilot to your user Codex config with the Codex CLI:
+
+```bash
+codex mcp add pilot -- npx -y @everydaydevopsio/pilot
+```
+
+Verify the server is configured:
+
+```bash
+codex mcp list
+```
+
+Restart Codex, then run `/mcp` in the Codex TUI to confirm that `pilot` is
+connected.
+
+### Project-level install
+
+To make pilot available for this repo only, add a project-scoped Codex config at
+`.codex/config.toml`:
+
+```toml
+[mcp_servers.pilot]
+command = "npx"
+args = ["-y", "@everydaydevopsio/pilot"]
+```
+
+Project-scoped config is loaded only after you trust the project in Codex. Commit
+`.codex/config.toml` if everyone working in the repo should get the same MCP
+server definition.
+
+### Local build
+
+When developing pilot itself, build the package first and point Codex at the
+compiled server:
+
+```bash
+pnpm run build
+codex mcp add pilot-local -- node /path/to/pilot/dist/mcp/index.js
+```
+
+Or use the equivalent project-scoped config:
+
+```toml
+[mcp_servers.pilot]
+command = "node"
+args = ["/path/to/pilot/dist/mcp/index.js"]
+```
+
 ## Claude Code Integration
 
 Add the MCP server to Claude Code:

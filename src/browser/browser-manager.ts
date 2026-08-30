@@ -216,7 +216,7 @@ export class BrowserManager {
       this.cleanupUserDataDir();
     });
 
-    await waitForChromeReady(port);
+    await waitForChromeReady(port, opts.startupTimeoutMs);
     await this.connect();
 
     return { headless, viewport: viewportPreset };

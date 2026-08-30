@@ -25,6 +25,7 @@ export interface LaunchOptions {
   viewportHeight?: number;
   deviceScaleFactor?: number;
   responsive?: boolean;
+  startupTimeoutMs?: number;
 }
 
 export type SandboxDecision =

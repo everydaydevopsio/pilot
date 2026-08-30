@@ -1,0 +1,3 @@
+[mcp_servers.pilot]
+command = "node"
+args = ["/workspace/pilot/dist/mcp/index.js"]
