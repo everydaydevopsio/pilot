@@ -55,6 +55,36 @@ pnpm run build
 pnpm start
 ```
 
+### Linux preflight
+
+Before launching Chrome on Linux, verify the browser environment:
+
+```bash
+pilot check
+```
+
+The command checks that Chrome is executable, the Pilot profile directory is
+writable, an ephemeral CDP port can bind on `127.0.0.1`, outbound HTTPS works,
+and a graphical display is available when `PILOT_HEADLESS=false`.
+
+Visible Chrome requires `DISPLAY` or `WAYLAND_DISPLAY`. On a Linux server or in
+CI, use `PILOT_HEADLESS=true`. To exercise visible-mode behavior without a real
+desktop, run Pilot under Xvfb:
+
+```bash
+xvfb-run -a npx @everydaydevopsio/pilot
+```
+
+Sandboxed environments must allow loopback socket binding for Chrome DevTools.
+An `EPERM` error while binding `127.0.0.1` is a host sandbox or container-policy
+restriction, not a Chrome renderer-sandbox failure. Do not work around it with
+`PILOT_CHROME_NO_SANDBOX=true`; allow loopback binding instead. If the home
+directory is read-only, point profiles at a writable location, for example:
+
+```bash
+export XDG_DATA_HOME=/tmp/pilot-data
+```
+
 ### With Docker
 
 To use the MCP server from a Docker container, pass `-i` so stdin stays open for stdio communication:
@@ -323,7 +353,7 @@ src/
 │   ├── network/            # Network buffer, monitor, header redaction
 │   ├── performance/        # Tracing + analysis
 │   └── security/           # Origin allow/block lists
-├── cli/                    # CLI commands (init)
+├── cli/                    # CLI commands (init, Linux preflight)
 ├── commands/               # Tool command implementations
 ├── mcp/                    # MCP server + tool registrations
 └── util/                   # Config, logger

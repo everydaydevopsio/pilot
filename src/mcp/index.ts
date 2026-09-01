@@ -31,6 +31,9 @@ async function run(): Promise<void> {
     console.log(
       '  init [--force]    Install the Claude Code debug-browser skill'
     );
+    console.log(
+      '  check             Run Linux browser-launch preflight checks'
+    );
     console.log('  (default)         Start the MCP server on stdio');
     console.log('');
     console.log('Options:');
@@ -75,6 +78,12 @@ async function run(): Promise<void> {
     const { runInit } = await import('../cli/init.js');
     const force = args.includes('--force');
     await runInit({ force });
+    return;
+  }
+
+  if (subcommand === 'check') {
+    const { runCheck } = await import('../cli/linux-check.js');
+    await runCheck();
     return;
   }
 

@@ -173,7 +173,17 @@ export async function findFreePort(): Promise<number> {
       const { port } = server.address() as net.AddressInfo;
       server.close(() => resolve(port));
     });
-    server.on('error', reject);
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      if (process.platform === 'linux' && error.code === 'EPERM') {
+        reject(
+          new Error(
+            'Pilot cannot bind a local Chrome DevTools port on 127.0.0.1 (EPERM). Allow loopback socket binding in the Linux sandbox or container policy.'
+          )
+        );
+        return;
+      }
+      reject(error);
+    });
   });
 }
 
