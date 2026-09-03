@@ -1,0 +1,58 @@
+name: Build Skill
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: skill-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-skill:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build skill and package
+        run: pnpm run build
+
+      - name: Verify generated skill is committed
+        run: git diff --exit-code -- src/cli/skill-template.ts
+
+      - name: Test skill installer
+        run: pnpm exec jest test/init.test.ts --runInBand
+
+      - name: Smoke-test Claude and Codex installation
+        run: |
+          install_dir="$(mktemp -d)"
+          cd "$install_dir"
+          npx --yes "$GITHUB_WORKSPACE" init --agent both
+          cmp "$GITHUB_WORKSPACE/skills/pilot/SKILL.md" .claude/skills/pilot/SKILL.md
+          cmp "$GITHUB_WORKSPACE/skills/pilot/SKILL.md" .agents/skills/pilot/SKILL.md
+
+      - name: Upload Pilot skill
+        uses: actions/upload-artifact@v6
+        with:
+          name: pilot-skill
+          path: skills/pilot

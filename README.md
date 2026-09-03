@@ -75,6 +75,26 @@ desktop, run Pilot under Xvfb:
 xvfb-run -a npx @everydaydevopsio/pilot
 ```
 
+#### Remote Linux sessions
+
+When Codex or Claude runs over SSH or in a remote desktop session, the agent's
+MCP process may not inherit the remote display even though applications such as
+`xterm` open successfully. Check the display inside that session with
+`printenv DISPLAY`, forward the value to the Pilot MCP server, and restart the
+agent. With Codex, for example:
+
+```toml
+[mcp_servers.pilot]
+command = "npx"
+args = ["-y", "@everydaydevopsio/pilot"]
+env = { DISPLAY = ":1" }
+```
+
+Replace `:1` with the value from the remote session. Forward `XAUTHORITY` too if
+the X server requires it. For SSH-based display forwarding, start the agent from
+the `ssh -Y` session so it inherits the forwarded display; forwarded display
+values can change between sessions.
+
 Sandboxed environments must allow loopback socket binding for Chrome DevTools.
 An `EPERM` error while binding `127.0.0.1` is a host sandbox or container-policy
 restriction, not a Chrome renderer-sandbox failure. Do not work around it with
@@ -133,6 +153,31 @@ Project-scoped config is loaded only after you trust the project in Codex. Commi
 `.codex/config.toml` only when it is portable for all contributors, such as the
 `npx` example above. Keep local-build configs with absolute paths in your user
 config or an uncommitted local override.
+
+### Visible Chrome cannot find the Linux display
+
+If desktop applications open normally but `browser_start` reports that
+`DISPLAY` or `WAYLAND_DISPLAY` is missing, the Codex MCP process did not inherit
+the graphical session environment. Check the display used by the desktop
+session:
+
+```bash
+printenv DISPLAY
+```
+
+Forward that value to Pilot in the applicable Codex `config.toml`. For example,
+if the command prints `:1`:
+
+```toml
+[mcp_servers.pilot]
+command = "npx"
+args = ["-y", "@everydaydevopsio/pilot"]
+env = { DISPLAY = ":1" }
+```
+
+Restart Codex after changing the configuration so the Pilot MCP server starts
+with the updated environment. If the graphical session requires an Xauthority
+cookie, forward `XAUTHORITY` in the same `env` map.
 
 ### Local build
 
@@ -359,39 +404,49 @@ src/
 └── util/                   # Config, logger
 ```
 
-## Claude Code Skill
+## Pilot Skill for Claude Code and Codex
 
-The `init` command creates a Claude Code skill in your project that automates the browser debugging workflow.
+The `init` command installs a project skill that teaches Claude Code or Codex how
+to run and troubleshoot Pilot.
 
 ### Initialize the Skill
 
 ```bash
 # Using npx (no installation required)
-npx @everydaydevopsio/pilot init
+npx @everydaydevopsio/pilot init --agent claude
+npx @everydaydevopsio/pilot init --agent codex
+
+# Install for both agents
+npx @everydaydevopsio/pilot init --agent both
 
 # If installed globally
-pilot init
+pilot init --agent codex
 
 # Overwrite existing skill
-pilot init --force
+pilot init --agent codex --force
 ```
 
-This creates `.claude/skills/debug-browser/SKILL.md` in your project.
+The Claude target is `.claude/skills/pilot/SKILL.md`; the Codex target is
+`.agents/skills/pilot/SKILL.md`. Omitting `--agent` continues to default to
+Claude for compatibility. Restart the agent after installation if it does not
+detect the skill immediately.
 
 ### Using the Skill
 
-In Claude Code, say **"debug in browser"** or use **/debug-browser**. The skill will:
+Ask Claude or Codex to **"use Pilot to open and debug this page"**, or invoke the
+`pilot` skill explicitly. The skill teaches the agent to:
 
-1. Add the MCP server to your Claude Code session
-2. Call `browser_start` to launch Chrome
-3. Spawn a background sub-agent to watch for console errors
+1. Start Chrome and navigate with the Pilot MCP tools
+2. Use accessibility snapshots and stable element refs for interaction
+3. Inspect console errors, failed requests, styles, and performance data
+4. Diagnose Linux display, profile, Chrome, and loopback preflight failures
 
 ### Error Watching Workflow
 
-1. Ask Claude: "Use pilot to open localhost:3000 and watch for errors"
-2. Claude clears the error buffer and tells you to proceed
+1. Ask the agent: "Use pilot to open localhost:3000 and watch for errors"
+2. The agent clears the error buffer and tells you to proceed
 3. You interact with the app in Chrome
-4. Claude periodically checks for errors and can fix them in your source code
+4. The agent checks for errors and can fix them in your source code
 
 ## License
 

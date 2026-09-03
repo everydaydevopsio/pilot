@@ -1,62 +1,53 @@
-import { mkdir, writeFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { SKILL_CONTENT } from './skill-template.js';
 
-const SKILL_DIR = '.claude/skills/debug-browser';
-const SKILL_FILE = 'SKILL.md';
+export type SkillAgent = 'claude' | 'codex' | 'both';
+
+const SKILL_DIRS: Record<Exclude<SkillAgent, 'both'>, string> = {
+  claude: '.claude/skills/pilot',
+  codex: '.agents/skills/pilot'
+};
 
 export async function runInit(
-  options: { force?: boolean } = {}
+  options: { force?: boolean; agent?: SkillAgent; cwd?: string } = {}
 ): Promise<void> {
-  const cwd = process.cwd();
-  const skillDir = join(cwd, SKILL_DIR);
-  const skillPath = join(skillDir, SKILL_FILE);
+  const cwd = options.cwd ?? process.cwd();
+  const agent = options.agent ?? 'claude';
+  const agents: Array<Exclude<SkillAgent, 'both'>> =
+    agent === 'both' ? ['claude', 'codex'] : [agent];
+  const skillPaths = agents.map((target) => ({
+    target,
+    path: join(cwd, SKILL_DIRS[target], 'SKILL.md')
+  }));
 
-  // Check if skill already exists
-  try {
-    await stat(skillPath);
-    if (!options.force) {
-      console.log(`\x1b[33mSkill already exists:\x1b[0m ${skillPath}`);
-      console.log('Use --force to overwrite.');
-      process.exit(1);
+  for (const skill of skillPaths) {
+    try {
+      await stat(skill.path);
+      if (!options.force) {
+        throw new Error(
+          `Skill already exists: ${skill.path}\nUse --force to overwrite.`
+        );
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        continue;
+      }
+      throw error;
     }
-  } catch {
-    // File doesn't exist, continue
   }
 
-  // Create directory structure
-  try {
-    await mkdir(skillDir, { recursive: true });
-  } catch (err) {
-    console.error(`\x1b[31mFailed to create directory:\x1b[0m ${skillDir}`);
-    console.error(err);
-    process.exit(1);
+  for (const skill of skillPaths) {
+    await mkdir(dirname(skill.path), { recursive: true });
+    await writeFile(skill.path, SKILL_CONTENT, 'utf8');
+    console.log(
+      `\x1b[32m✓ Installed Pilot skill for ${skill.target}:\x1b[0m ${skill.path}`
+    );
   }
 
-  // Write SKILL.md
-  try {
-    await writeFile(skillPath, SKILL_CONTENT, 'utf-8');
-  } catch (err) {
-    console.error(`\x1b[31mFailed to write skill file:\x1b[0m ${skillPath}`);
-    console.error(err);
-    process.exit(1);
-  }
-
-  // Success message
-  console.log(`\x1b[32m✓ Created Claude Code skill:\x1b[0m ${skillPath}`);
   console.log('');
-  console.log('\x1b[1mUsage:\x1b[0m');
-  console.log('  In Claude Code, say "debug in browser" or use /debug-browser');
-  console.log('');
-  console.log('\x1b[1mThe skill will:\x1b[0m');
-  console.log('  1. Start Chrome with remote debugging');
-  console.log('  2. Launch the pilot browser service');
-  console.log('  3. Add the MCP server to your session');
-  console.log('  4. Spawn an error-watching sub-agent');
-  console.log('');
-  console.log('\x1b[1mPrerequisites:\x1b[0m');
-  console.log('  - Google Chrome installed');
-  console.log(
-    '  - pilot (install with: npm install -g @everydaydevopsio/pilot)'
-  );
+  console.log('\x1b[1mNext steps:\x1b[0m');
+  console.log('  1. Configure the pilot MCP server for your agent.');
+  console.log('  2. Restart the agent so it discovers the installed skill.');
+  console.log('  3. Ask it to use Pilot to open or debug a web page.');
 }
