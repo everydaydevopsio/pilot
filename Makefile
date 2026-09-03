@@ -7,7 +7,7 @@ E2E_MCP_COMPOSE  := $(COMPOSE) -f docker-compose.e2e.yml --profile mcp
 SMOKE_COMPOSE    := $(COMPOSE) -f docker-compose.smoke.yml
 NVM_DIR ?= $(HOME)/.nvm
 NODE_VERSION := $(shell tr -d '[:space:]' < .nvmrc)
-PNPM_VERSION := $(shell node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]" 2>/dev/null || sed -n 's/.*"packageManager": "pnpm@\([^+]*\).*/\1/p' package.json)
+PACKAGE_MANAGER := $(shell sed -n 's/.*"packageManager": *"\([^"]*\)".*/\1/p' package.json)
 
 .PHONY: deps setup up down logs up-local down-local logs-local build clean smoke e2e e2e-mcp
 
@@ -34,7 +34,7 @@ setup: deps
 	nvm install "$(NODE_VERSION)"; \
 	nvm use "$(NODE_VERSION)"; \
 	corepack enable; \
-	corepack prepare "pnpm@$(PNPM_VERSION)" --activate; \
+	corepack prepare "$(PACKAGE_MANAGER)" --activate; \
 	pnpm install --frozen-lockfile; \
 	pnpm build
 
