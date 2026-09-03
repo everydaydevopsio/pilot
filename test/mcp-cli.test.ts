@@ -31,6 +31,7 @@ describe('CLI flags', () => {
     expect(result.stdout).toContain('Usage: pilot');
     expect(result.stdout).toContain('--version');
     expect(result.stdout).toContain('--help');
+    expect(result.stdout).toContain('check');
     expect(result.stdout).toContain('PILOT_CDP_PORT');
     expect(result.stderr).toBe('');
   });

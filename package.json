@@ -8,7 +8,8 @@
     "pilot": "dist/mcp/index.js"
   },
   "scripts": {
-    "build": "rimraf ./dist && tsc",
+    "build:skill": "node scripts/build-skill.mjs",
+    "build": "pnpm run build:skill && rimraf ./dist && tsc",
     "start": "node dist/mcp/index.js",
     "dev": "tsx src/mcp/index.ts",
     "lint": "eslint .",

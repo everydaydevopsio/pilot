@@ -20,6 +20,7 @@ import {
   waitForChromeReady,
   cleanupLockFiles
 } from './chrome-launcher.js';
+import { assertLinuxBrowserPrerequisites } from './preflight.js';
 import {
   connectToChrome,
   enableDomains,
@@ -152,7 +153,6 @@ export class BrowserManager {
       );
     }
 
-    const port = await findFreePort();
     const chromePath = findChromeExecutable(opts.chromePath);
 
     const profileName = opts.profileName ?? this.config.profileName;
@@ -164,8 +164,6 @@ export class BrowserManager {
       );
     }
 
-    mkdirSync(userDataDir, { recursive: true });
-
     const viewportPreset = opts.viewport ?? this.config.viewport;
     this.viewportConfig = resolveViewport({
       preset: viewportPreset,
@@ -176,6 +174,16 @@ export class BrowserManager {
     });
 
     const headless = opts.headless ?? this.config.headless;
+
+    await assertLinuxBrowserPrerequisites({
+      headless,
+      chromePath,
+      profileName,
+      checkNetwork: false
+    });
+
+    mkdirSync(userDataDir, { recursive: true });
+    const port = await findFreePort();
 
     this.chromeProcess = launchChrome({
       chromePath,

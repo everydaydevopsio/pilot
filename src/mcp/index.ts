@@ -28,8 +28,12 @@ async function run(): Promise<void> {
     console.log('Usage: pilot [command] [options]');
     console.log('');
     console.log('Commands:');
+    console.log('  init [--agent claude|codex|both] [--force]');
     console.log(
-      '  init [--force]    Install the Claude Code debug-browser skill'
+      '                    Install the Pilot skill (default: claude)'
+    );
+    console.log(
+      '  check             Run Linux browser-launch preflight checks'
     );
     console.log('  (default)         Start the MCP server on stdio');
     console.log('');
@@ -74,7 +78,25 @@ async function run(): Promise<void> {
   if (subcommand === 'init') {
     const { runInit } = await import('../cli/init.js');
     const force = args.includes('--force');
-    await runInit({ force });
+    const agentArg = args.find((arg) => arg.startsWith('--agent='));
+    const agentIndex = args.indexOf('--agent');
+    const agent =
+      agentArg?.slice('--agent='.length) ??
+      (agentIndex >= 0 ? args[agentIndex + 1] : undefined) ??
+      'claude';
+    if (!['claude', 'codex', 'both'].includes(agent)) {
+      throw new Error('--agent must be one of: claude, codex, both');
+    }
+    await runInit({
+      force,
+      agent: agent as 'claude' | 'codex' | 'both'
+    });
+    return;
+  }
+
+  if (subcommand === 'check') {
+    const { runCheck } = await import('../cli/linux-check.js');
+    await runCheck();
     return;
   }
 
