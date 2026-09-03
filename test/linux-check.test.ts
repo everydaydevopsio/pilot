@@ -11,7 +11,7 @@ import {
   checkOutboundHttps,
   checkProfile,
   runLinuxChecks
-} from '../src/cli/linux-check.js';
+} from '../src/browser/preflight.js';
 
 describe('Linux browser preflight', () => {
   const originalDisplay = process.env.DISPLAY;
@@ -95,7 +95,8 @@ describe('Linux browser preflight', () => {
   it('reports invalid profile names as actionable failures', async () => {
     const result = await checkProfile('../invalid');
     expect(result).toMatchObject({ name: 'profile', ok: false });
-    expect(result.detail).toContain('set XDG_DATA_HOME');
+    expect(result.detail).toContain('Invalid profile name');
+    expect(result.detail).not.toContain('not writable');
   });
 
   it('reports successful outbound HTTPS checks', async () => {
@@ -115,11 +116,33 @@ describe('Linux browser preflight', () => {
     await expect(checkOutboundHttps(100, requestFn)).resolves.toEqual({
       name: 'network',
       ok: true,
-      detail: 'HTTPS status 204'
+      detail: 'HTTPS status 204 (expected 204)'
     });
     expect(response.resume).toHaveBeenCalled();
     expect(req.end).toHaveBeenCalled();
   });
+
+  it.each([302, 401, 500, undefined])(
+    'rejects unexpected outbound HTTPS status %s',
+    async (statusCode) => {
+      const response = Object.assign(new EventEmitter(), {
+        statusCode,
+        resume: jest.fn()
+      });
+      const req = Object.assign(new EventEmitter(), {
+        end: jest.fn(),
+        destroy: jest.fn()
+      });
+      const requestFn = jest.fn((_url, _options, callback) => {
+        callback?.(response as unknown as IncomingMessage);
+        return req as unknown as ClientRequest;
+      }) as unknown as typeof request;
+
+      const result = await checkOutboundHttps(100, requestFn);
+      expect(result.ok).toBe(false);
+      expect(result.detail).toContain('expected 204');
+    }
+  );
 
   it('reports outbound HTTPS errors', async () => {
     const req = Object.assign(new EventEmitter(), {

@@ -20,7 +20,7 @@ import {
   waitForChromeReady,
   cleanupLockFiles
 } from './chrome-launcher.js';
-import { assertLinuxBrowserPrerequisites } from '../cli/linux-check.js';
+import { assertLinuxBrowserPrerequisites } from './preflight.js';
 import {
   connectToChrome,
   enableDomains,
