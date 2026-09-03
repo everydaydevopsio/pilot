@@ -140,8 +140,9 @@ connected.
 
 ### Project-level install
 
-To make pilot available for this repo only, add a project-scoped Codex config at
-`.codex/config.toml`:
+To make pilot available for a repo only, add a project-scoped Codex config at
+`.codex/config.toml`. For projects that consume the published package, use the
+portable configuration below:
 
 ```toml
 [mcp_servers.pilot]
@@ -150,9 +151,10 @@ args = ["-y", "@everydaydevopsio/pilot"]
 ```
 
 Project-scoped config is loaded only after you trust the project in Codex. Commit
-`.codex/config.toml` only when it is portable for all contributors, such as the
-`npx` example above. Keep local-build configs with absolute paths in your user
-config or an uncommitted local override.
+`.codex/config.toml` only when it works for all contributors, such as the `npx`
+example above or a repository-relative local build configured by the repository.
+Keep local-build configs with absolute paths in your user config or an
+uncommitted local override.
 
 ### Visible Chrome cannot find the Linux display
 
@@ -183,6 +185,16 @@ cookie, forward `XAUTHORITY` in the same `env` map.
 
 When developing pilot itself, build the package first and point Codex at the
 compiled server:
+
+This repository commits `.codex/config.toml` with a repository-relative entry
+point. Run the pinned setup before starting Codex from the repository root:
+
+```bash
+make setup
+```
+
+For a local build outside this repository's project config, use an absolute
+path:
 
 ```bash
 pnpm run build

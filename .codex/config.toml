@@ -1,6 +1,10 @@
+# Project-local Codex MCP template. Run `make setup` before starting
+# Codex from the repository root.
 [mcp_servers.pilot]
 command = "node"
 args = ["dist/mcp/index.js"]
+cwd = "."
+enabled = true
 env = { DISPLAY = ":1" }
 enabled_tools = [
   "browser_start",
@@ -39,4 +43,7 @@ enabled_tools = [
   "browser_connect",
   "browser_tabs",
 ]
+
+# Require an explicit Accept for every tool exposed by this server, including
+# every tool in the allowlist above.
 default_tools_approval_mode = "approve"
