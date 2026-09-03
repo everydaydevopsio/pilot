@@ -39,7 +39,9 @@ export function checkDisplay(headless: boolean): LinuxCheckResult {
       };
 }
 
-async function checkChrome(chromePath?: string): Promise<LinuxCheckResult> {
+export async function checkChrome(
+  chromePath?: string
+): Promise<LinuxCheckResult> {
   try {
     const resolved = findChromeExecutable(chromePath);
     await access(resolved, constants.X_OK);
@@ -49,9 +51,12 @@ async function checkChrome(chromePath?: string): Promise<LinuxCheckResult> {
   }
 }
 
-async function checkProfile(profileName: string): Promise<LinuxCheckResult> {
-  const profileDir = resolveUserDataDir(profileName);
+export async function checkProfile(
+  profileName: string
+): Promise<LinuxCheckResult> {
+  let profileDir = profileName;
   try {
+    profileDir = resolveUserDataDir(profileName);
     await mkdir(profileDir, { recursive: true });
     await access(profileDir, constants.R_OK | constants.W_OK | constants.X_OK);
     return { name: 'profile', ok: true, detail: profileDir };
@@ -64,7 +69,7 @@ async function checkProfile(profileName: string): Promise<LinuxCheckResult> {
   }
 }
 
-async function checkLoopback(): Promise<LinuxCheckResult> {
+export async function checkLoopback(): Promise<LinuxCheckResult> {
   try {
     const port = await findFreePort();
     return { name: 'loopback', ok: true, detail: `127.0.0.1:${port}` };
@@ -77,9 +82,12 @@ async function checkLoopback(): Promise<LinuxCheckResult> {
   }
 }
 
-async function checkOutboundHttps(timeoutMs = 5000): Promise<LinuxCheckResult> {
+export async function checkOutboundHttps(
+  timeoutMs = 5000,
+  requestFn: typeof request = request
+): Promise<LinuxCheckResult> {
   return new Promise((resolve) => {
-    const req = request(
+    const req = requestFn(
       'https://clients3.google.com/generate_204',
       { method: 'HEAD', timeout: timeoutMs },
       (response) => {
