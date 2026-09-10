@@ -52,7 +52,7 @@ jobs:
           cmp "$GITHUB_WORKSPACE/skills/pilot/SKILL.md" .agents/skills/pilot/SKILL.md
 
       - name: Upload Pilot skill
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: pilot-skill
           path: skills/pilot
