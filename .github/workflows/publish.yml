@@ -28,6 +28,7 @@ jobs:
     outputs:
       version: ${{ steps.select.outputs.version }}
       tag: ${{ steps.select.outputs.tag }}
+      release_notes: ${{ steps.notes.outputs.release_notes }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -74,11 +75,49 @@ jobs:
           cache: 'pnpm'
 
       - name: Update package.json version
+        run: npm version ${{ steps.select.outputs.version }} --no-git-tag-version
+
+      # OPENAI_API_KEY is an organization secret, so a missing key means
+      # misconfiguration, not an opt-out: fail here rather than tag a release
+      # whose changelog and release notes were quietly skipped. Scoped to this
+      # step so the key is never exported to the whole job, where dependency
+      # installs, builds and every third-party action would inherit it.
+      - name: Require OpenAI API key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          npm version ${{ steps.select.outputs.version }} --no-git-tag-version
+          set -euo pipefail
+          if [ -z "${OPENAI_API_KEY//[[:space:]]/}" ]; then
+            echo "::error::OPENAI_API_KEY is not available to this repository. Grant the organization secret to everydaydevopsio/pilot." >&2
+            exit 1
+          fi
+
+      # castoff reads `git describe --tags --abbrev=0 HEAD^` and logs from
+      # there to HEAD, so it runs before the release commit is made and the
+      # tag is created.
+      - name: Generate AI release notes
+        id: notes
+        uses: everydaydevopsio/castoff/castoff@v2
+        env:
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          tag: ${{ steps.select.outputs.tag }}
+
+      # No guard on changelog_entry: the action rejects an empty entry, which
+      # is the signal that castoff produced nothing usable.
+      - name: Update CHANGELOG.md
+        uses: everydaydevopsio/castoff/changelog@v2
+        with:
+          version: ${{ steps.select.outputs.version }}
+          entry: ${{ steps.notes.outputs.changelog_entry }}
+
+      - name: Commit, tag and push
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json
+          git add package.json CHANGELOG.md
           git commit -m "chore: bump version to ${{ steps.select.outputs.version }}"
           git tag ${{ steps.select.outputs.tag }}
           git push origin HEAD:main
@@ -147,9 +186,20 @@ jobs:
       - name: Publish to npmjs
         run: npm publish --access public --provenance
 
+      # castoff notes come from the bump_and_tag job, which only runs on
+      # workflow_dispatch. A tag pushed by hand skips that job, so fall back to
+      # GitHub's own generated notes rather than publishing an empty body.
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ needs.bump_and_tag.outputs.release_notes }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -n "${NOTES//[[:space:]]/}" ]; then
+            printf '%s\n' "${NOTES}" > "${RUNNER_TEMP}/release-notes.md"
+            gh release create "${TAG}" --title "${TAG}" --notes-file "${RUNNER_TEMP}/release-notes.md"
+          else
+            echo "No castoff notes for ${TAG}; falling back to generated notes."
+            gh release create "${TAG}" --title "${TAG}" --generate-notes
+          fi
