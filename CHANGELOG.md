@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.2] - 2026-10-01
+
+### Highlights
+- Added release-note generation with **Castoff**. (#38; addresses #37)
+
+### Fixes
+- No standalone bug fixes were recorded in this release.
+
+### Changes
+- **Runtime dependencies:** Updated `@modelcontextprotocol/sdk` from 1.30.0 to 1.30.1 and `zod` from 4.4.3 to 4.6.5. (#36, #21, #31)
+- **Testing:** Updated Jest from 30.4.2 to 30.5.1, alongside additional testing dependency updates. (#19, #27, #35)
+- **Development tooling:** Updated `tsx` from 4.23.12 to 4.23.15 and `globals` from 17.11.0 to 17.12.0, alongside a grouped update to three development dependencies. (#22, #33, #28, #34)
+- **CI:** Upgraded `actions/upload-artifact` from v6 to v7. (#26)
+
+**Full changelog:** [0.6.1 → 0.6.2](../../compare/0.6.1...0.6.2)
+
 ## 0.6.0
 
 Agent-oriented browser debugging and interaction release. Adds structured accessibility snapshots, element ref-based interaction, network/console/CSS inspection, file operations, performance tracing, security controls, and existing Chrome connection support.
