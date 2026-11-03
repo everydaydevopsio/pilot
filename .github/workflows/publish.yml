@@ -112,6 +112,13 @@ jobs:
           version: ${{ steps.select.outputs.version }}
           entry: ${{ steps.notes.outputs.changelog_entry }}
 
+      # The release commit is pushed straight to main without running CI, so
+      # format the generated entry here or every later PR fails `prettier`.
+      - name: Format CHANGELOG.md
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec prettier --write CHANGELOG.md
+
       - name: Commit, tag and push
         run: |
           set -euo pipefail
