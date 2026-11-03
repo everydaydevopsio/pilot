@@ -4,7 +4,6 @@
 // errors must say what was cleaned up and how to recover.
 import {
   chmodSync,
-  existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -222,9 +221,14 @@ describe('cleanupLockFiles', () => {
   });
 
   it('removes a lock owned by the given pid', () => {
-    symlinkSync(`${hostname()}-1234`, join(dir, 'SingletonLock'));
+    const lockPath = join(dir, 'SingletonLock');
+    symlinkSync(`${hostname()}-1234`, lockPath);
+    expect(lstatSync(lockPath).isSymbolicLink()).toBe(true);
     cleanupLockFiles(dir, 1234);
-    expect(existsSync(join(dir, 'SingletonLock'))).toBe(false);
+    // lstat, not existsSync: the dangling symlink must itself be gone.
+    expect(() => lstatSync(lockPath)).toThrow(
+      expect.objectContaining({ code: 'ENOENT' })
+    );
   });
 
   it('leaves a lock that belongs to another browser', () => {
