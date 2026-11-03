@@ -182,9 +182,17 @@ async function terminate(
     return { outcome: 'failed', detail: term.error };
   if (await waitForProcessExit(pid, 5000)) return { outcome: 'stopped' };
 
-  // A failed identity check here means the original process is gone.
   const kill = signal('SIGKILL');
-  if (kill === 'gone') return { outcome: 'stopped' };
+  if (kill === 'gone') {
+    // Only a confirmed exit counts as stopped. A live pid that no longer
+    // verifies (ps failed, or the process changed) is left alone.
+    return isProcessAlive(pid)
+      ? {
+          outcome: 'failed',
+          detail: `pid ${pid} did not exit after SIGTERM and could no longer be verified as Chrome using ${userDataDir}; not killed, lock kept`
+        }
+      : { outcome: 'stopped' };
+  }
   if (typeof kill === 'object')
     return { outcome: 'failed', detail: kill.error };
   return (await waitForProcessExit(pid, 2000))

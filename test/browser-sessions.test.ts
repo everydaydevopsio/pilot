@@ -177,6 +177,35 @@ unix('Pilot sessions', () => {
     expect(isSymlink(lockPath)).toBe(true);
   });
 
+  it('keeps the lock when the process ignores SIGTERM and stops verifying', async () => {
+    // On SIGTERM this process replaces itself with one that lacks the
+    // profile flag: alive, but no longer verifiable as Pilot Chrome.
+    const dir = profileDir('changes');
+    const child = spawn(
+      '/bin/sh',
+      [
+        '-c',
+        'trap "exec sleep 31" TERM; while :; do sleep 0.1; done',
+        'sh',
+        `--user-data-dir=${dir}`
+      ],
+      { stdio: 'ignore' }
+    );
+    children.push(child);
+    const lockPath = lock(dir, `${hostname()}-${child.pid}`);
+    for (let i = 0; i < 100; i++) {
+      if (isPilotChrome(child.pid!, dir)) break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+
+    const [result] = await stopPilotBrowsers();
+
+    expect(result).toMatchObject({ profile: 'changes', outcome: 'failed' });
+    expect(result.detail).toMatch(/could no longer be verified/);
+    expect(isProcessAlive(child.pid!)).toBe(true);
+    expect(isSymlink(lockPath)).toBe(true);
+  }, 15000);
+
   describe('MCP tools', () => {
     function register(context: Record<string, unknown>) {
       const server = { tool: jest.fn() };
