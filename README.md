@@ -16,7 +16,7 @@ Use pilot to open a URL, interact with it using semantic element refs, inspect n
 - **Node.js**: Use the version in `.nvmrc`. Supported: Node 22 (LTS) or 24 (Active LTS).
 - [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager)
 - [pnpm](https://pnpm.io) package manager (managed via Corepack)
-- [pre-commit](https://pre-commit.com) for Git hooks (optional but recommended)
+- [pre-commit](https://pre-commit.com) for Git hooks (installed by `make setup`)
 
 ### Install nvm
 
@@ -28,6 +28,16 @@ After installation, restart your shell (or `source` your shell profile) so the `
 
 ### Install dependencies
 
+The fastest path is `make setup`, which installs nvm and pre-commit with
+Homebrew, activates the pinned Node and pnpm versions, installs dependencies,
+builds, and installs the `pre-commit` and `pre-push` Git hooks:
+
+```bash
+make setup
+```
+
+To do the same steps manually:
+
 ```bash
 nvm install   # installs the version from .nvmrc (Node 24)
 nvm use
@@ -38,9 +48,8 @@ corepack prepare --activate
 
 pnpm install
 
-# Optional: Install Git hooks
-pre-commit install
-pre-commit install --hook-type pre-push
+# Install Git hooks
+pre-commit install --hook-type pre-commit --hook-type pre-push
 ```
 
 Corepack ships with Node.js and uses the `packageManager` field in `package.json` to pin the pnpm version, so every contributor and CI run uses the same one.

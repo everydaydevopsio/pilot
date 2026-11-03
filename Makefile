@@ -23,10 +23,14 @@ deps:
 	elif [ ! -s "$$(brew --prefix nvm)/nvm.sh" ]; then \
 		brew reinstall nvm; \
 	fi; \
+	if ! command -v pre-commit >/dev/null 2>&1; then \
+		brew install pre-commit; \
+	fi; \
 	mkdir -p "$(NVM_DIR)"; \
 	echo "Development prerequisites are installed."
 
-# Install the pinned Node and pnpm versions, then install project dependencies.
+# Install the pinned Node and pnpm versions, install project dependencies,
+# and install the pre-commit and pre-push Git hooks.
 setup: deps
 	@set -eu; \
 	export NVM_DIR="$(NVM_DIR)"; \
@@ -36,7 +40,8 @@ setup: deps
 	corepack enable; \
 	corepack prepare "$(PACKAGE_MANAGER)" --activate; \
 	pnpm install --frozen-lockfile; \
-	pnpm build
+	pnpm build; \
+	pre-commit install --hook-type pre-commit --hook-type pre-push
 
 up:
 	$(COMPOSE) up --build
