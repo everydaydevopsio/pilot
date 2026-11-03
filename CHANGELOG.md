@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.6.3] - 2026-11-03
+
+This release adds browser session management tools and improves Chrome startup, recovery, and shutdown reliability.
+
+### Highlights
+
+- **New MCP tools:** `browser_status` and `browser_stop_all` let you inspect browser session status and stop all browser sessions. Both tools are included in the tool allowlist. (#56)
+- **More resilient startup:** Chrome startup now fails promptly if the process exits, while a longer default timeout gives slower launches more time to complete. (#53)
+
+### Fixes
+
+- **Safer session shutdown:** Verify the Chrome executable and recheck process identity before each signal. A browser is reported as stopped only after its exit is confirmed, and lock cleanup failures are surfaced. (#56)
+- **Better startup recovery:** Clean up failed launches, clear launch state when Chrome cannot be spawned, and provide clearer explanations of profile conflicts. (#53, #55)
+
+### Changes
+
+- Strengthened tests for launch-timeout cleanup on slow machines and removal of dangling `SingletonLock` symlinks. (#55, #56)
+- Updated `make setup` to install pre-commit hooks and corrected changelog formatting to pass CI checks. (#51, #52)
+- Updated runtime dependencies:
+  - `@modelcontextprotocol/sdk`: 1.30.1 → 1.32.2
+  - `pino`: 10.3.1 → 10.4.0
+  - `zod`: 4.6.5 → 4.6.7
+- Refreshed development tooling, including `ts-jest`, `globals`, and `pino-pretty`.
+
+**Full changelog:** [0.6.2…0.6.3](../../compare/0.6.2...0.6.3)
+
 ## [0.6.2] - 2026-10-01
 
 ### Highlights
