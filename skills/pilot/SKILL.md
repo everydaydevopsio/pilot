@@ -34,6 +34,15 @@ env = { DISPLAY = ":1" }
 
 Replace `:1` with the actual value. If the X server requires a cookie, forward `XAUTHORITY` in the same map. For SSH, use trusted X11 forwarding (`ssh -Y`) when policy permits, or use a remote desktop session and its display value. Use `PILOT_HEADLESS=true` on systems without a desktop. In CI, use headless mode or run Pilot under Xvfb.
 
+### Startup failures
+
+Read the `Launch:`, `Cleanup:`, and `Next:` lines in the `browser_start` error before retrying.
+
+- A failed `browser_start` stops the Chrome it launched and frees the profile unless `Cleanup:` names a pid that did not stop. Do not switch profiles just because a start failed.
+- On a timeout, retry once with a larger `startupTimeoutMs` (for example `180000`). First runs and software-rendered Linux desktops can be slow.
+- If Chrome exited in visible mode, check the display (above) or retry with `headless: true`.
+- If the profile is already in use, the error names the owning Chrome pid and host. `browser_stop` cannot stop a browser that this session did not launch. Ask the user before stopping that process. Otherwise use a different `profileName`.
+
 ### Other Linux preflight failures
 
 - If the profile directory is not writable, set `XDG_DATA_HOME` to a writable directory.

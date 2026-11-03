@@ -1,11 +1,27 @@
 // Issue #25: browser_start must not wait out the full startup timeout when
 // Chrome cannot start, and the default timeout must cover slow cold starts.
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
-import { tmpdir } from 'os';
+// Issue #32: a failed launch must not leave Chrome holding the profile, and
+// errors must say what was cleaned up and how to recover.
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from 'fs';
+import { hostname, tmpdir } from 'os';
 import { join } from 'path';
 import { BrowserManager } from '../src/browser.js';
 import {
   DEFAULT_STARTUP_TIMEOUT_MS,
+  cleanupLockFiles,
+  isProcessAlive,
+  isProfileLocked,
+  resolveUserDataDir,
   waitForChromeReady
 } from '../src/browser/chrome-launcher.js';
 import { loadConfig } from '../src/util/config.js';
@@ -100,6 +116,121 @@ describe('BrowserManager.launch startup failures', () => {
         startupTimeoutMs: 500
       })
     ).rejects.toThrow(/did not become ready on port \d+ within 500ms/);
+  });
+
+  // Mimics Chrome holding its profile: takes the SingletonLock like Chrome
+  // does, records its pid, then never opens DevTools.
+  function lockingChrome(): string {
+    return fakeChrome(
+      'locks.sh',
+      [
+        'for arg in "$@"; do',
+        '  case "$arg" in --user-data-dir=*) dir="${arg#--user-data-dir=}" ;; esac',
+        'done',
+        `ln -s "${hostname()}-$$" "$dir/SingletonLock"`,
+        `echo $$ > "${workDir}/chrome.pid"`,
+        'exec sleep 30'
+      ].join('\n')
+    );
+  }
+
+  it('stops Chrome and releases the profile after a readiness timeout', async () => {
+    const chromePath = lockingChrome();
+    let error: Error | undefined;
+    try {
+      await manager!.launch({
+        chromePath,
+        headless: true,
+        profileName: 'timeout',
+        startupTimeoutMs: 1000
+      });
+    } catch (err) {
+      error = err as Error;
+    }
+
+    const pid = Number(readFileSync(join(workDir, 'chrome.pid'), 'utf8'));
+    expect(error?.message).toMatch(/did not become ready/);
+    expect(error?.message).toContain(
+      `Pilot stopped the Chrome process it launched (pid ${pid}); profile "timeout" is free to reuse.`
+    );
+    expect(error?.message).toMatch(/larger startupTimeoutMs/);
+    expect(error?.message).toMatch(/mode=headless/);
+    expect(isProcessAlive(pid)).toBe(false);
+    expect(isProfileLocked(resolveUserDataDir('timeout'))).toBe(false);
+    expect(manager!.isLaunched()).toBe(false);
+
+    // The retry no longer reports the profile as in use.
+    await expect(
+      manager!.launch({
+        chromePath,
+        headless: true,
+        profileName: 'timeout',
+        startupTimeoutMs: 1000
+      })
+    ).rejects.toThrow(/did not become ready/);
+  });
+
+  it('names the live owner when the profile is locked on this host', async () => {
+    const userDataDir = resolveUserDataDir('busy');
+    mkdirSync(userDataDir, { recursive: true });
+    symlinkSync(
+      `${hostname()}-${process.pid}`,
+      join(userDataDir, 'SingletonLock')
+    );
+
+    await expect(
+      manager!.launch({
+        chromePath: fakeChrome('unused.sh', 'exit 0'),
+        headless: true,
+        profileName: 'busy'
+      })
+    ).rejects.toThrow(
+      new RegExp(
+        `already in use[\\s\\S]*Chrome pid ${process.pid} on this host[\\s\\S]*browser_stop will not stop it[\\s\\S]*different profileName`
+      )
+    );
+    // A live owner's lock is never removed.
+    expect(lstatSync(join(userDataDir, 'SingletonLock')).isSymbolicLink()).toBe(
+      true
+    );
+  });
+
+  it('explains a lock created on another host', async () => {
+    const userDataDir = resolveUserDataDir('remote');
+    mkdirSync(userDataDir, { recursive: true });
+    symlinkSync('other-host-4242', join(userDataDir, 'SingletonLock'));
+
+    await expect(
+      manager!.launch({
+        chromePath: fakeChrome('unused.sh', 'exit 0'),
+        headless: true,
+        profileName: 'remote'
+      })
+    ).rejects.toThrow(/pid 4242 on host "other-host"[\s\S]*delete the lock/);
+  });
+});
+
+describe('cleanupLockFiles', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'pilot-lock-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('removes a lock owned by the given pid', () => {
+    symlinkSync(`${hostname()}-1234`, join(dir, 'SingletonLock'));
+    cleanupLockFiles(dir, 1234);
+    expect(existsSync(join(dir, 'SingletonLock'))).toBe(false);
+  });
+
+  it('leaves a lock that belongs to another browser', () => {
+    symlinkSync(`${hostname()}-5678`, join(dir, 'SingletonLock'));
+    cleanupLockFiles(dir, 1234);
+    expect(lstatSync(join(dir, 'SingletonLock')).isSymbolicLink()).toBe(true);
   });
 });
 
