@@ -292,21 +292,27 @@ export function profileLockOwner(
  * Remove the profile lock files left by a Chrome process Pilot launched.
  * A SingletonLock that names a different process is left alone: if Chrome
  * handed off to another instance already using the profile, that lock
- * belongs to the live browser.
+ * belongs to the live browser. Returns false when a lock was left in place.
  */
-export function cleanupLockFiles(userDataDir: string, ownerPid: number): void {
+export function cleanupLockFiles(
+  userDataDir: string,
+  ownerPid: number
+): boolean {
   const owner = profileLockOwner(userDataDir);
   if (
     fileOrSymlinkExists(join(userDataDir, 'SingletonLock')) &&
     (!owner || owner.pid !== ownerPid || owner.lockHost !== hostname())
   ) {
-    return;
+    return false;
   }
+  let removed = true;
   for (const lockName of ['SingletonLock', 'lockfile']) {
     try {
       unlinkSync(join(userDataDir, lockName));
-    } catch {
-      // lock file may not exist — that's fine
+    } catch (err) {
+      // A lock file that does not exist is already gone.
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') removed = false;
     }
   }
+  return removed;
 }

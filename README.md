@@ -144,12 +144,40 @@ Recovery steps for a new desktop or server:
 4. If the profile is **already in use**, the error names the Chrome pid that
    holds the profile lock and the host it runs on. Pilot does not track that
    browser, so `browser_stop` reports that no browser is running and will not
-   stop it. Close that Chrome or stop its pid, or call `browser_start` with a
-   different `profileName`. Pilot removes a lock automatically only when the
+   stop it. Call `browser_status` to see every Pilot profile and which process
+   holds it. To stop it, close that Chrome, call `browser_stop_all`, or call
+   `browser_start` with a different `profileName`. Pilot removes a lock automatically only when the
    owning process on this host is gone. It never deletes a lock held by a live
    browser. For a lock created on another host, delete
    `<profile dir>/SingletonLock` only after confirming that no browser on that
    host still uses the profile.
+
+### Browsers from other Pilot sessions
+
+Each Pilot MCP session tracks only the browser it started. Two tools work
+across sessions:
+
+- `browser_status` is read-only. It reports the browser this session tracks,
+  the Pilot data directory (`$XDG_DATA_HOME/pilot`, or `~/.local/share/pilot`),
+  and each profile's lock state:
+  - `unlocked`: the profile is free.
+  - `locked`: a live process on this host holds the lock. The `pilotChrome`
+    field shows whether that process is Chrome using this profile.
+  - `stale`: the process that held the lock is gone.
+  - `locked_other_host`: the lock was created on another host.
+  - `locked_unknown`: Pilot cannot read the lock's owner.
+- `browser_stop_all` stops this session's browser, then every Chrome on this
+  host that holds a Pilot profile lock. Before each signal, it checks that the
+  process is a Chrome or Chromium executable and that its command line has the
+  exact argument `--user-data-dir=<that profile's directory>`. A reused pid or
+  an unrelated process is never stopped. A browser is reported as stopped only
+  after it has exited, and a lock that cannot be removed is reported as failed.
+  It also removes stale locks. Locks from other hosts and locks with no readable owner
+  are reported and left in place. It can close browsers that other agents are
+  using, so confirm with the user first.
+
+Process verification uses `ps`, so `browser_stop_all` skips every locked
+profile on Windows.
 
 ### With Docker
 
@@ -288,11 +316,13 @@ Or add to `.mcp.json` in your project:
 
 **Browser Lifecycle:**
 
-| Tool              | Description                                         |
-| ----------------- | --------------------------------------------------- |
-| `browser_start`   | Launch Chrome                                       |
-| `browser_stop`    | Stop Chrome (or disconnect from external Chrome)    |
-| `browser_connect` | Connect to an existing Chrome with remote debugging |
+| Tool               | Description                                         |
+| ------------------ | --------------------------------------------------- |
+| `browser_start`    | Launch Chrome                                       |
+| `browser_stop`     | Stop Chrome (or disconnect from external Chrome)    |
+| `browser_status`   | List this session's browser and Pilot profile locks |
+| `browser_stop_all` | Stop every Pilot-managed Chrome on this host        |
+| `browser_connect`  | Connect to an existing Chrome with remote debugging |
 
 **Snapshot & Find:**
 
@@ -449,6 +479,7 @@ src/
 │   ├── chrome-launcher.ts  # Chrome process management
 │   ├── connection.ts       # CDP connection + reconnect
 │   ├── events.ts           # CDP event listeners
+│   ├── sessions.ts         # Profile lock status and stop-all
 │   ├── tabs.ts             # Tab management
 │   ├── types.ts            # Shared types
 │   ├── inspect/            # Snapshot, styles, element refs

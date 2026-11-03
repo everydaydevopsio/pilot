@@ -28,5 +28,16 @@ export interface LaunchOptions {
   startupTimeoutMs?: number;
 }
 
+export interface SessionInfo {
+  /** launched: Chrome started by this session; external: browser_connect. */
+  mode: 'launched' | 'external' | 'none';
+  connected: boolean;
+  profile?: string;
+  userDataDir?: string;
+  pid?: number;
+  host?: string;
+  cdpPort?: number;
+}
+
 export type SandboxDecision =
   { disable: false } | { disable: true; reason: 'env_override' | 'root_user' };

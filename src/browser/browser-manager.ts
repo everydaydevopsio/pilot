@@ -2,7 +2,7 @@ import type { Client } from 'chrome-remote-interface';
 import type { ChildProcess } from 'child_process';
 import { mkdirSync } from 'fs';
 import { hostname } from 'os';
-import { join } from 'path';
+import { basename, join } from 'path';
 import { getLogger } from '../util/logger.js';
 import type { Config } from '../util/config.js';
 import type { ViewportConfig } from '../viewport.js';
@@ -11,6 +11,7 @@ import type {
   BrowserEventCallback,
   BrowserState,
   LaunchOptions,
+  SessionInfo,
   TabInfo
 } from './types.js';
 import {
@@ -94,6 +95,30 @@ export class BrowserManager {
 
   isExternalChrome(): boolean {
     return this.external;
+  }
+
+  getSessionInfo(): SessionInfo {
+    if (this.external) {
+      return {
+        mode: 'external',
+        connected: this.client !== null,
+        host: this.externalHost ?? undefined,
+        cdpPort: this.externalPort ?? undefined
+      };
+    }
+    if (this.chromeProcess) {
+      return {
+        mode: 'launched',
+        connected: this.client !== null,
+        pid: this.chromeProcess.pid,
+        cdpPort: this.launchedCdpPort ?? undefined,
+        userDataDir: this.launchedUserDataDir ?? undefined,
+        profile: this.launchedUserDataDir
+          ? basename(this.launchedUserDataDir)
+          : undefined
+      };
+    }
+    return { mode: 'none', connected: false };
   }
 
   getViewportConfig(): ViewportConfig | null {

@@ -5,6 +5,8 @@
 export const EXPECTED_TOOLS = [
   'browser_start',
   'browser_stop',
+  'browser_status',
+  'browser_stop_all',
   'browser_screenshot',
   'browser_navigate',
   'browser_click',
