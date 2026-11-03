@@ -198,18 +198,24 @@ export class BrowserManager {
     this.launchedUserDataDir = userDataDir;
 
     const stderrChunks: string[] = [];
-    this.chromeProcess.stderr?.on('data', (data: Buffer) => {
+    const proc = this.chromeProcess;
+    let spawnError: Error | null = null;
+    let exitStatus: string | null = null;
+
+    proc.stderr?.on('data', (data: Buffer) => {
       stderrChunks.push(data.toString());
     });
 
-    this.chromeProcess.on('exit', (code, signal) => {
+    proc.on('error', (err) => {
+      spawnError = err;
+      getLogger().warn({ err, chromePath }, 'Chrome process failed to start');
+    });
+
+    proc.on('exit', (code, signal) => {
       const logger = getLogger();
       const stderr = stderrChunks.join('').trim();
-      const stderrFiltered = stderr
-        .split('\n')
-        .filter((l) => !l.includes('dbus/bus.cc'))
-        .join('\n')
-        .trim();
+      const stderrFiltered = filterChromeStderr(stderr);
+      exitStatus = signal ? `signal ${signal}` : `exit code ${code}`;
       logger.warn(
         {
           code,
@@ -219,12 +225,29 @@ export class BrowserManager {
         },
         'Chrome process exited'
       );
-      this.chromeProcess = null;
-      this.launchedCdpPort = null;
-      this.cleanupUserDataDir();
+      if (this.chromeProcess === proc) {
+        this.chromeProcess = null;
+        this.launchedCdpPort = null;
+        this.cleanupUserDataDir();
+      }
     });
 
-    await waitForChromeReady(port, opts.startupTimeoutMs);
+    await waitForChromeReady(port, opts.startupTimeoutMs, () => {
+      if (spawnError) {
+        return new Error(
+          `Chrome failed to start (${chromePath}): ${spawnError.message}`,
+          { cause: spawnError }
+        );
+      }
+      if (exitStatus) {
+        const stderr = filterChromeStderr(stderrChunks.join('').trim());
+        return new Error(
+          `Chrome exited (${exitStatus}) before DevTools became ready on port ${port}.` +
+            (stderr ? ` Chrome stderr: ${stderr.slice(-1000)}` : '')
+        );
+      }
+      return null;
+    });
     await this.connect();
 
     return { headless, viewport: viewportPreset };
@@ -462,4 +485,12 @@ export class BrowserManager {
       this.cleanupUserDataDir();
     }
   }
+}
+
+function filterChromeStderr(stderr: string): string {
+  return stderr
+    .split('\n')
+    .filter((l) => !l.includes('dbus/bus.cc'))
+    .join('\n')
+    .trim();
 }

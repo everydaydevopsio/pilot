@@ -188,12 +188,21 @@ export function formatPortBindError(error: NodeJS.ErrnoException): Error {
   return error;
 }
 
+// Cold starts on Linux servers (first-run profile setup, software rendering
+// under Xvfb/VNC) can take well over 30s. A healthy start returns as soon as
+// DevTools answers, and a Chrome that exits is detected immediately, so the
+// longer ceiling only matters when Chrome is genuinely slow.
+export const DEFAULT_STARTUP_TIMEOUT_MS = 90000;
+
 export async function waitForChromeReady(
   port: number,
-  timeoutMs = 30000
+  timeoutMs = DEFAULT_STARTUP_TIMEOUT_MS,
+  earlyFailure?: () => Error | null
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    const failure = earlyFailure?.();
+    if (failure) throw failure;
     try {
       await CDP.List({ host: '127.0.0.1', port });
       return;
@@ -201,6 +210,8 @@ export async function waitForChromeReady(
       await new Promise((r) => setTimeout(r, 200));
     }
   }
+  const failure = earlyFailure?.();
+  if (failure) throw failure;
   throw new Error(
     `Chrome did not become ready on port ${port} within ${timeoutMs}ms`
   );

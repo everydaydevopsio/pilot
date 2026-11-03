@@ -3,6 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Client } from 'chrome-remote-interface';
 import type { BrowserManager } from '../../browser.js';
 import type { BrowserContext } from '../server.js';
+import { DEFAULT_STARTUP_TIMEOUT_MS } from '../../browser/chrome-launcher.js';
 import { executeScreenshot } from '../../commands/screenshot.js';
 import { executeNavigate } from '../../commands/navigate.js';
 import { executeClick } from '../../commands/click.js';
@@ -185,9 +186,9 @@ const startShape = {
     .number()
     .int()
     .positive()
-    .default(30000)
+    .default(DEFAULT_STARTUP_TIMEOUT_MS)
     .describe(
-      'Timeout waiting for Chrome DevTools to become ready, in milliseconds.'
+      `Timeout waiting for Chrome DevTools to become ready, in milliseconds. Defaults to ${DEFAULT_STARTUP_TIMEOUT_MS}. Startup fails immediately if Chrome exits, so raising this only helps when Chrome is slow to start (for example a first run on a Linux server with software rendering).`
     )
 };
 
