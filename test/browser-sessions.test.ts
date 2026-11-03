@@ -16,6 +16,7 @@ import {
   listProfiles,
   pilotDataDir,
   readProcessCommand,
+  stopLockedProfile,
   stopPilotBrowsers
 } from '../src/browser/sessions.js';
 import { isProcessAlive } from '../src/browser/chrome-launcher.js';
@@ -152,6 +153,28 @@ unix('Pilot sessions', () => {
     expect(isSymlink(remoteLock)).toBe(true);
 
     expect(byName.free).toBeUndefined();
+  });
+
+  it('re-verifies the process before signalling a cached status', async () => {
+    // Simulates pid reuse: the status was verified earlier, but the pid now
+    // belongs to a process that is not Chrome using this profile.
+    const dir = profileDir('reused');
+    const replacement = holder('--some-other-flag');
+    const lockPath = lock(dir, `${hostname()}-${replacement.pid}`);
+    await waitAlive(replacement.pid!);
+
+    const result = await stopLockedProfile({
+      profile: 'reused',
+      userDataDir: dir,
+      state: 'locked',
+      pid: replacement.pid,
+      host: hostname(),
+      pilotChrome: true
+    });
+
+    expect(result.outcome).toBe('skipped');
+    expect(isProcessAlive(replacement.pid!)).toBe(true);
+    expect(isSymlink(lockPath)).toBe(true);
   });
 
   describe('MCP tools', () => {

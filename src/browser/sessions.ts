@@ -146,25 +146,50 @@ async function waitForProcessExit(pid: number, ms: number): Promise<boolean> {
   return !isProcessAlive(pid);
 }
 
-async function terminate(pid: number): Promise<string | null> {
-  try {
-    process.kill(pid, 'SIGTERM');
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === 'ESRCH') return null;
-    return `could not signal pid ${pid} (${code})`;
+type TerminateResult =
+  | { outcome: 'stopped' }
+  | { outcome: 'not_pilot' }
+  | { outcome: 'failed'; detail: string };
+
+/**
+ * SIGTERM, then SIGKILL. The pid's identity is re-checked right before each
+ * signal: a process seen earlier can exit and its pid be reused while
+ * other browsers are being stopped.
+ */
+async function terminate(
+  pid: number,
+  userDataDir: string
+): Promise<TerminateResult> {
+  const signal = (sig: NodeJS.Signals): 'sent' | 'gone' | { error: string } => {
+    if (!isPilotChrome(pid, userDataDir)) return 'gone';
+    try {
+      process.kill(pid, sig);
+      return 'sent';
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'ESRCH') return 'gone';
+      return { error: `could not send ${sig} to pid ${pid} (${code})` };
+    }
+  };
+
+  const term = signal('SIGTERM');
+  if (term === 'gone') {
+    return isProcessAlive(pid)
+      ? { outcome: 'not_pilot' }
+      : { outcome: 'stopped' };
   }
-  if (await waitForProcessExit(pid, 5000)) return null;
-  try {
-    process.kill(pid, 'SIGKILL');
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === 'ESRCH') return null;
-    return `could not SIGKILL pid ${pid} (${code})`;
-  }
+  if (typeof term === 'object')
+    return { outcome: 'failed', detail: term.error };
+  if (await waitForProcessExit(pid, 5000)) return { outcome: 'stopped' };
+
+  // A failed identity check here means the original process is gone.
+  const kill = signal('SIGKILL');
+  if (kill === 'gone') return { outcome: 'stopped' };
+  if (typeof kill === 'object')
+    return { outcome: 'failed', detail: kill.error };
   return (await waitForProcessExit(pid, 2000))
-    ? null
-    : `pid ${pid} did not exit after SIGKILL`;
+    ? { outcome: 'stopped' }
+    : { outcome: 'failed', detail: `pid ${pid} did not exit after SIGKILL` };
 }
 
 /**
@@ -204,30 +229,35 @@ export async function stopPilotBrowsers(): Promise<StopResult[]> {
         });
         continue;
       case 'locked':
-        if (!status.pilotChrome) {
-          results.push({
-            profile,
-            pid,
-            outcome: 'skipped',
-            detail: `pid ${pid} holds the lock but its command line does not show Chrome using ${status.userDataDir}; not stopped`
-          });
-          continue;
-        }
-        {
-          const error = await terminate(pid!);
-          if (error) {
-            results.push({ profile, pid, outcome: 'failed', detail: error });
-          } else {
-            cleanupLockFiles(status.userDataDir, pid!);
-            results.push({
-              profile,
-              pid,
-              outcome: 'stopped',
-              detail: `stopped Chrome pid ${pid}`
-            });
-          }
-        }
+        results.push(await stopLockedProfile(status));
     }
   }
   return results;
+}
+
+/** Stop the Chrome holding a profile lock, if it is verifiably Pilot's. */
+export async function stopLockedProfile(
+  status: ProfileStatus
+): Promise<StopResult> {
+  const { profile, pid, userDataDir } = status;
+  const notPilot: StopResult = {
+    profile,
+    pid,
+    outcome: 'skipped',
+    detail: `pid ${pid} holds the lock but its command line does not show Chrome using ${userDataDir}; not stopped`
+  };
+  if (pid === undefined || !status.pilotChrome) return notPilot;
+
+  const result = await terminate(pid, userDataDir);
+  if (result.outcome === 'not_pilot') return notPilot;
+  if (result.outcome === 'failed') {
+    return { profile, pid, outcome: 'failed', detail: result.detail };
+  }
+  cleanupLockFiles(userDataDir, pid);
+  return {
+    profile,
+    pid,
+    outcome: 'stopped',
+    detail: `stopped Chrome pid ${pid}`
+  };
 }
