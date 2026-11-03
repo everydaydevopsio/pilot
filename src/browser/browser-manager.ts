@@ -209,6 +209,12 @@ export class BrowserManager {
     proc.on('error', (err) => {
       spawnError = err;
       getLogger().warn({ err, chromePath }, 'Chrome process failed to start');
+      // A failed spawn does not necessarily emit 'exit'.
+      if (this.chromeProcess === proc && proc.pid === undefined) {
+        this.chromeProcess = null;
+        this.launchedCdpPort = null;
+        this.launchedUserDataDir = null;
+      }
     });
 
     proc.on('exit', (code, signal) => {

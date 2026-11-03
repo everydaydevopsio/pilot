@@ -61,8 +61,10 @@ describe('BrowserManager.launch startup failures', () => {
   });
 
   it('fails fast when the Chrome executable cannot be spawned', async () => {
-    const chromePath = join(workDir, 'not-executable');
-    writeFileSync(chromePath, 'not a program');
+    // Executable, so Linux preflight passes, but spawn fails with ENOENT.
+    const chromePath = join(workDir, 'missing-interpreter');
+    writeFileSync(chromePath, '#!/definitely/missing/interpreter\n');
+    chmodSync(chromePath, 0o755);
     const started = Date.now();
 
     await expect(
@@ -72,8 +74,19 @@ describe('BrowserManager.launch startup failures', () => {
         profileName: 'nospawn',
         startupTimeoutMs: 20000
       })
-    ).rejects.toThrow(/Chrome (failed to start|exited)/);
+    ).rejects.toThrow(/Chrome failed to start/);
     expect(Date.now() - started).toBeLessThan(10000);
+    expect(manager!.isLaunched()).toBe(false);
+
+    // The manager can launch again after a spawn failure.
+    await expect(
+      manager!.launch({
+        chromePath,
+        headless: true,
+        profileName: 'nospawn',
+        startupTimeoutMs: 20000
+      })
+    ).rejects.toThrow(/Chrome failed to start/);
   });
 
   it('reports a readiness timeout when Chrome runs but never opens DevTools', async () => {
