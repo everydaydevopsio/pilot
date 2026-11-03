@@ -324,7 +324,12 @@ export function registerBrowserTools(
     async () => {
       if (!context.manager) {
         return {
-          content: [{ type: 'text' as const, text: 'Browser is not running.' }]
+          content: [
+            {
+              type: 'text' as const,
+              text: 'Browser is not running. This Pilot session is not tracking a launched or connected browser; a failed browser_start stops the Chrome it launched and reports the outcome in its error.'
+            }
+          ]
         };
       }
 

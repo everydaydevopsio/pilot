@@ -282,7 +282,26 @@ export function launchChrome(opts: {
   });
 }
 
-export function cleanupLockFiles(userDataDir: string): void {
+export function profileLockOwner(
+  userDataDir: string
+): { pid: number; lockHost: string } | null {
+  return extractLockPid(join(userDataDir, 'SingletonLock'));
+}
+
+/**
+ * Remove the profile lock files left by a Chrome process Pilot launched.
+ * A SingletonLock that names a different process is left alone: if Chrome
+ * handed off to another instance already using the profile, that lock
+ * belongs to the live browser.
+ */
+export function cleanupLockFiles(userDataDir: string, ownerPid: number): void {
+  const owner = profileLockOwner(userDataDir);
+  if (
+    fileOrSymlinkExists(join(userDataDir, 'SingletonLock')) &&
+    (!owner || owner.pid !== ownerPid || owner.lockHost !== hostname())
+  ) {
+    return;
+  }
   for (const lockName of ['SingletonLock', 'lockfile']) {
     try {
       unlinkSync(join(userDataDir, lockName));

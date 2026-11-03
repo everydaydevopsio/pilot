@@ -1,6 +1,8 @@
 import type { Client } from 'chrome-remote-interface';
 import type { ChildProcess } from 'child_process';
 import { mkdirSync } from 'fs';
+import { hostname } from 'os';
+import { join } from 'path';
 import { getLogger } from '../util/logger.js';
 import type { Config } from '../util/config.js';
 import type { ViewportConfig } from '../viewport.js';
@@ -18,7 +20,9 @@ import {
   launchChrome,
   resolveUserDataDir,
   waitForChromeReady,
-  cleanupLockFiles
+  cleanupLockFiles,
+  profileLockOwner,
+  DEFAULT_STARTUP_TIMEOUT_MS
 } from './chrome-launcher.js';
 import { assertLinuxBrowserPrerequisites } from './preflight.js';
 import {
@@ -159,9 +163,7 @@ export class BrowserManager {
     const userDataDir = resolveUserDataDir(profileName);
 
     if (isProfileLocked(userDataDir)) {
-      throw new Error(
-        `Profile "${profileName}" is already in use by another browser instance.`
-      );
+      throw new Error(describeProfileConflict(profileName, userDataDir));
     }
 
     const viewportPreset = opts.viewport ?? this.config.viewport;
@@ -234,11 +236,13 @@ export class BrowserManager {
       if (this.chromeProcess === proc) {
         this.chromeProcess = null;
         this.launchedCdpPort = null;
-        this.cleanupUserDataDir();
+        this.cleanupUserDataDir(proc.pid);
       }
     });
 
-    await waitForChromeReady(port, opts.startupTimeoutMs, () => {
+    const startupTimeoutMs =
+      opts.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
+    const earlyFailure = (): Error | null => {
       if (spawnError) {
         return new Error(
           `Chrome failed to start (${chromePath}): ${spawnError.message}`,
@@ -253,10 +257,52 @@ export class BrowserManager {
         );
       }
       return null;
-    });
+    };
+
+    try {
+      await waitForChromeReady(port, startupTimeoutMs, earlyFailure);
+    } catch (err) {
+      const timedOut = earlyFailure() === null;
+      const cleanup = await this.abortLaunch(proc, userDataDir);
+      throw new Error(
+        describeLaunchFailure({
+          reason: (err as Error).message,
+          timedOut,
+          startupTimeoutMs,
+          chromePath,
+          profileName,
+          userDataDir,
+          headless,
+          port,
+          cleanup
+        }),
+        { cause: err }
+      );
+    }
     await this.connect();
 
     return { headless, viewport: viewportPreset };
+  }
+
+  /**
+   * Stop a Chrome process whose launch failed so it does not keep holding
+   * the profile lock while this manager forgets about it.
+   */
+  private async abortLaunch(
+    proc: ChildProcess,
+    userDataDir: string
+  ): Promise<LaunchCleanup> {
+    if (this.chromeProcess === proc) {
+      this.chromeProcess = null;
+      this.launchedCdpPort = null;
+    }
+    this.launchedUserDataDir = null;
+    const pid = proc.pid;
+    const stopped = await stopChromeProcess(proc);
+    if (stopped && pid !== undefined) {
+      cleanupLockFiles(userDataDir, pid);
+    }
+    return { pid, stopped };
   }
 
   async connect(): Promise<void> {
@@ -433,9 +479,9 @@ export class BrowserManager {
     this.retryTimer.unref();
   }
 
-  private cleanupUserDataDir(): void {
-    if (this.launchedUserDataDir) {
-      cleanupLockFiles(this.launchedUserDataDir);
+  private cleanupUserDataDir(ownerPid: number | undefined): void {
+    if (this.launchedUserDataDir && ownerPid !== undefined) {
+      cleanupLockFiles(this.launchedUserDataDir, ownerPid);
     }
     this.launchedUserDataDir = null;
   }
@@ -465,30 +511,15 @@ export class BrowserManager {
       const proc = this.chromeProcess;
       this.chromeProcess = null;
       this.launchedCdpPort = null;
-      try {
-        proc.kill();
-      } catch {
-        // process may have already exited
+      if (await stopChromeProcess(proc)) {
+        this.cleanupUserDataDir(proc.pid);
+      } else {
+        getLogger().warn(
+          { pid: proc.pid },
+          'Chrome did not exit after SIGKILL; leaving its profile lock in place'
+        );
+        this.launchedUserDataDir = null;
       }
-      await new Promise<void>((resolve) => {
-        if (proc.exitCode !== null) {
-          resolve();
-          return;
-        }
-        const timer = setTimeout(() => {
-          try {
-            proc.kill('SIGKILL');
-          } catch {
-            // process may have already exited
-          }
-          resolve();
-        }, 5000);
-        proc.once('exit', () => {
-          clearTimeout(timer);
-          resolve();
-        });
-      });
-      this.cleanupUserDataDir();
     }
   }
 }
@@ -499,4 +530,118 @@ function filterChromeStderr(stderr: string): string {
     .filter((l) => !l.includes('dbus/bus.cc'))
     .join('\n')
     .trim();
+}
+
+interface LaunchCleanup {
+  pid: number | undefined;
+  stopped: boolean;
+}
+
+/** Terminate a Chrome process, escalating to SIGKILL. Resolves true once it has exited. */
+async function stopChromeProcess(proc: ChildProcess): Promise<boolean> {
+  const hasExited = () => proc.exitCode !== null || proc.signalCode !== null;
+  if (proc.pid === undefined || hasExited()) return true;
+
+  const waitForExit = (ms: number) =>
+    new Promise<boolean>((resolve) => {
+      if (hasExited()) {
+        resolve(true);
+        return;
+      }
+      const timer = setTimeout(() => {
+        proc.off('exit', onExit);
+        resolve(hasExited());
+      }, ms);
+      const onExit = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      proc.once('exit', onExit);
+    });
+
+  try {
+    proc.kill();
+  } catch {
+    // process may have already exited
+  }
+  if (await waitForExit(5000)) return true;
+  try {
+    proc.kill('SIGKILL');
+  } catch {
+    // process may have already exited
+  }
+  return waitForExit(2000);
+}
+
+function describeProfileConflict(
+  profileName: string,
+  userDataDir: string
+): string {
+  const lockPath = join(userDataDir, 'SingletonLock');
+  const owner = profileLockOwner(userDataDir);
+  const message = [
+    `Profile "${profileName}" is already in use by another browser instance.`
+  ];
+  if (owner && owner.lockHost === hostname()) {
+    message.push(
+      `Chrome pid ${owner.pid} on this host holds ${lockPath}. This Pilot session is not tracking that browser, so browser_stop will not stop it.`,
+      `Close that Chrome window or stop pid ${owner.pid}, or call browser_start with a different profileName.`
+    );
+  } else if (owner) {
+    message.push(
+      `The lock ${lockPath} was created by pid ${owner.pid} on host "${owner.lockHost}", not this host ("${hostname()}"), so Pilot cannot tell whether that browser is still running.`,
+      `Call browser_start with a different profileName. If no browser on "${owner.lockHost}" uses this profile any more, delete the lock file and retry.`
+    );
+  } else {
+    message.push(
+      `Pilot could not identify the owner of the lock in ${userDataDir}.`,
+      `Call browser_start with a different profileName. If no Chrome is using that directory, delete its SingletonLock and lockfile and retry.`
+    );
+  }
+  return message.join(' ');
+}
+
+function describeLaunchFailure(details: {
+  reason: string;
+  timedOut: boolean;
+  startupTimeoutMs: number;
+  chromePath: string;
+  profileName: string;
+  userDataDir: string;
+  headless: boolean;
+  port: number;
+  cleanup: LaunchCleanup;
+}): string {
+  const { cleanup } = details;
+  const display =
+    process.env.DISPLAY || process.env.WAYLAND_DISPLAY || '(not set)';
+  const launch = [
+    `chrome=${details.chromePath}`,
+    `profile="${details.profileName}" (${details.userDataDir})`,
+    `mode=${details.headless ? 'headless' : 'visible'}`,
+    `devtools port=${details.port}`,
+    ...(process.platform === 'linux' && !details.headless
+      ? [`display=${display}`]
+      : [])
+  ].join(', ');
+
+  let cleanupText: string;
+  if (cleanup.pid === undefined) {
+    cleanupText = 'No Chrome process was left running.';
+  } else if (cleanup.stopped) {
+    cleanupText = `Pilot stopped the Chrome process it launched (pid ${cleanup.pid}); profile "${details.profileName}" is free to reuse.`;
+  } else {
+    cleanupText = `Chrome (pid ${cleanup.pid}) did not stop and may still hold profile "${details.profileName}". Stop it (kill -9 ${cleanup.pid}) or call browser_start with a different profileName.`;
+  }
+
+  const nextSteps = details.timedOut
+    ? `Chrome can be slow on a first run or with software rendering; retry with a larger startupTimeoutMs (this attempt used ${details.startupTimeoutMs}ms). Run \`pilot check\` to diagnose the environment.`
+    : `Run \`pilot check\` to diagnose the environment${details.headless ? '' : ', or retry with headless: true if no graphical display is available'}.`;
+
+  return [
+    details.reason,
+    `Launch: ${launch}.`,
+    `Cleanup: ${cleanupText}`,
+    `Next: ${nextSteps}`
+  ].join('\n');
 }

@@ -114,6 +114,43 @@ directory is read-only, point profiles at a writable location, for example:
 export XDG_DATA_HOME=/tmp/pilot-data
 ```
 
+### When `browser_start` fails
+
+`browser_start` waits up to `startupTimeoutMs` (default 90000) for Chrome
+DevTools to answer. A healthy start usually takes a few seconds. If Chrome exits
+or cannot be spawned, the call fails right away with Chrome's exit status and
+stderr, without waiting for the timeout.
+
+Every startup error ends with three lines:
+
+- `Launch:` shows the Chrome executable, the profile and its directory,
+  headless or visible mode, the DevTools port, and (for visible mode on Linux)
+  the display.
+- `Cleanup:` reports whether Pilot stopped the Chrome it launched. After a
+  failed start, Pilot stops its own Chrome and releases the profile lock, so a
+  retry with the same profile does not report that the profile is in use. If
+  Chrome did not exit, the error gives its pid so you can stop it.
+- `Next:` suggests the most likely fix.
+
+Recovery steps for a new desktop or server:
+
+1. Run `pilot check` (Linux) to confirm Chrome, the display, the profile
+   directory, and loopback binding.
+2. If startup **timed out**, Chrome is probably just slow, for example on a
+   first run with a new profile or with software rendering under Xvfb/VNC.
+   Retry with a larger `startupTimeoutMs`, such as `180000`.
+3. If Chrome **exited** in visible mode, the display is usually missing or
+   unreachable (see above). Retry with `headless: true` to confirm.
+4. If the profile is **already in use**, the error names the Chrome pid that
+   holds the profile lock and the host it runs on. Pilot does not track that
+   browser, so `browser_stop` reports that no browser is running and will not
+   stop it. Close that Chrome or stop its pid, or call `browser_start` with a
+   different `profileName`. Pilot removes a lock automatically only when the
+   owning process on this host is gone. It never deletes a lock held by a live
+   browser. For a lock created on another host, delete
+   `<profile dir>/SingletonLock` only after confirming that no browser on that
+   host still uses the profile.
+
 ### With Docker
 
 To use the MCP server from a Docker container, pass `-i` so stdin stays open for stdio communication:
