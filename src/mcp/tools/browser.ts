@@ -4,6 +4,11 @@ import type { Client } from 'chrome-remote-interface';
 import type { BrowserManager } from '../../browser.js';
 import type { BrowserContext } from '../server.js';
 import { DEFAULT_STARTUP_TIMEOUT_MS } from '../../browser/chrome-launcher.js';
+import {
+  listProfiles,
+  pilotDataDir,
+  stopPilotBrowsers
+} from '../../browser/sessions.js';
 import { executeScreenshot } from '../../commands/screenshot.js';
 import { executeNavigate } from '../../commands/navigate.js';
 import { executeClick } from '../../commands/click.js';
@@ -338,6 +343,64 @@ export function registerBrowserTools(
 
       return {
         content: [{ type: 'text' as const, text: 'Browser stopped.' }]
+      };
+    }
+  );
+
+  server.tool(
+    'browser_status',
+    'Show the browser tracked by this Pilot session and the lock state of every Pilot profile on this machine (including browsers started by other Pilot sessions). Read-only. Use it to diagnose "profile already in use" errors.',
+    {},
+    async () => {
+      const status = {
+        session: context.manager?.getSessionInfo() ?? {
+          mode: 'none',
+          connected: false
+        },
+        dataDir: pilotDataDir(),
+        profiles: listProfiles()
+      };
+      return {
+        content: [
+          { type: 'text' as const, text: JSON.stringify(status, null, 2) }
+        ]
+      };
+    }
+  );
+
+  server.tool(
+    'browser_stop_all',
+    'Stop every Pilot-managed Chrome on this machine: the browser in this session plus any Chrome holding a Pilot profile lock, including ones started by other Pilot sessions. Only processes whose command line shows Chrome using a Pilot profile directory are stopped; browsers on other hosts and unverifiable locks are skipped. Also removes stale locks. Ask the user before calling this, since it can close browsers other agents are using.',
+    {},
+    async () => {
+      const lines: string[] = [];
+      if (context.manager) {
+        const info = context.manager.getSessionInfo();
+        await context.manager.destroy();
+        context.manager = null;
+        if (info.mode === 'launched') {
+          lines.push(
+            `this session: stopped Chrome pid ${info.pid} (profile "${info.profile}")`
+          );
+        } else if (info.mode === 'external') {
+          lines.push(
+            `this session: disconnected from ${info.host}:${info.cdpPort} (not stopped; Pilot did not launch it)`
+          );
+        }
+      }
+      for (const result of await stopPilotBrowsers()) {
+        lines.push(`${result.profile}: ${result.outcome} - ${result.detail}`);
+      }
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text:
+              lines.length > 0
+                ? lines.join('\n')
+                : 'No Pilot-managed browsers were running.'
+          }
+        ]
       };
     }
   );

@@ -41,7 +41,7 @@ Read the `Launch:`, `Cleanup:`, and `Next:` lines in the `browser_start` error b
 - A failed `browser_start` stops the Chrome it launched and frees the profile unless `Cleanup:` names a pid that did not stop. Do not switch profiles just because a start failed.
 - On a timeout, retry once with a larger `startupTimeoutMs` (for example `180000`). First runs and software-rendered Linux desktops can be slow.
 - If Chrome exited in visible mode, check the display (above) or retry with `headless: true`.
-- If the profile is already in use, the error names the owning Chrome pid and host. `browser_stop` cannot stop a browser that this session did not launch. Ask the user before stopping that process. Otherwise use a different `profileName`.
+- If the profile is already in use, the error names the owning Chrome pid and host. `browser_stop` cannot stop a browser that this session did not launch. Call `browser_status` to see which profiles are free and who holds the others. Use a different `profileName`, or, only after the user agrees, call `browser_stop_all`. It also stops browsers that other agents may be using.
 
 ### Other Linux preflight failures
 
