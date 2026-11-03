@@ -13,3 +13,8 @@
 - When adding, renaming, or removing a Pilot MCP tool, update the Codex tool allowlist and verify the Claude `.mcp.json` local-server configuration in the same change.
 - Build Pilot with `pnpm run build` before testing either MCP configuration so `dist/mcp/index.js` reflects the current source.
 - Preserve environment entries needed by the local development session, such as the Linux `DISPLAY` value. Do not assume one display number works on every machine or remote session.
+
+## Releases
+
+- Always release by running the `publish.yml` workflow with a `release_type` of `patch`, `minor`, or `major`, for example `gh workflow run publish.yml -f release_type=patch`. The workflow computes the version, updates `package.json` and `CHANGELOG.md`, creates and pushes the tag, publishes to npm, and creates the GitHub release.
+- Do not create or push release tags directly, and do not bump the version in `package.json` or edit the release entries in `CHANGELOG.md` by hand.
