@@ -2,6 +2,7 @@
 // Chrome processes that are verifiably using a Pilot profile.
 import { spawn, type ChildProcess } from 'child_process';
 import {
+  chmodSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -29,10 +30,23 @@ unix('Pilot sessions', () => {
   let workDir: string;
   const children: ChildProcess[] = [];
 
+  // bash, invoked through a symlink named "chrome" so ps reports a
+  // Chrome-like executable. /bin/sh is avoided because on macOS it re-execs
+  // another shell and loses the name.
+  function fakeChromeBinary(): string {
+    const path = join(workDir, 'chrome');
+    if (!isSymlink(path)) symlinkSync('/bin/bash', path);
+    return path;
+  }
+
   // A long-lived process whose command line carries the given argument,
   // standing in for Chrome started with --user-data-dir.
-  function holder(arg: string): ChildProcess {
-    const child = spawn('/bin/sh', ['-c', 'sleep 30; :', 'sh', arg], {
+  function holder(
+    arg: string,
+    script = 'sleep 30; :',
+    executable = fakeChromeBinary()
+  ): ChildProcess {
+    const child = spawn(executable, ['-c', script, 'bash', arg], {
       stdio: 'ignore'
     });
     children.push(child);
@@ -62,7 +76,7 @@ unix('Pilot sessions', () => {
   // Right after spawn, ps can still show the parent's command line.
   async function waitAlive(pid: number): Promise<void> {
     for (let i = 0; i < 100; i++) {
-      if (readProcessCommand(pid)?.includes('sleep 30')) return;
+      if (readProcessCommand(pid)?.includes(' -c ')) return;
       await new Promise((r) => setTimeout(r, 20));
     }
     throw new Error(`process ${pid} never showed its command line`);
@@ -118,6 +132,37 @@ unix('Pilot sessions', () => {
 
     expect(isPilotChrome(right.pid!, dir)).toBe(true);
     expect(isPilotChrome(prefix.pid!, dir)).toBe(false);
+  });
+
+  it('rejects a non-browser executable that carries the profile flag', async () => {
+    const dir = profileDir('shell');
+    const shell = holder(`--user-data-dir=${dir}`, 'sleep 30; :', '/bin/bash');
+    await waitAlive(shell.pid!);
+
+    expect(isPilotChrome(shell.pid!, dir)).toBe(false);
+  });
+
+  it('rejects the flag embedded inside another argument', async () => {
+    const dir = profileDir('embedded');
+    const embedded = holder(`x--user-data-dir=${dir}`);
+    await waitAlive(embedded.pid!);
+
+    expect(isPilotChrome(embedded.pid!, dir)).toBe(false);
+  });
+
+  // Root can unlink in a read-only directory, so the setup proves nothing.
+  const asNonRoot = process.getuid?.() === 0 ? it.skip : it;
+  asNonRoot('reports a stale lock it cannot remove as failed', async () => {
+    const dir = profileDir('readonly');
+    const lockPath = lock(dir, `${hostname()}-999999`);
+    chmodSync(dir, 0o555);
+    try {
+      const [result] = await stopPilotBrowsers();
+      expect(result).toMatchObject({ profile: 'readonly', outcome: 'failed' });
+      expect(isSymlink(lockPath)).toBe(true);
+    } finally {
+      chmodSync(dir, 0o755);
+    }
   });
 
   it('stops verified Pilot Chrome and leaves every other lock owner alone', async () => {
@@ -181,17 +226,10 @@ unix('Pilot sessions', () => {
     // On SIGTERM this process replaces itself with one that lacks the
     // profile flag: alive, but no longer verifiable as Pilot Chrome.
     const dir = profileDir('changes');
-    const child = spawn(
-      '/bin/sh',
-      [
-        '-c',
-        'trap "exec sleep 31" TERM; while :; do sleep 0.1; done',
-        'sh',
-        `--user-data-dir=${dir}`
-      ],
-      { stdio: 'ignore' }
+    const child = holder(
+      `--user-data-dir=${dir}`,
+      'trap "exec sleep 31" TERM; while :; do sleep 0.1; done'
     );
-    children.push(child);
     const lockPath = lock(dir, `${hostname()}-${child.pid}`);
     for (let i = 0; i < 100; i++) {
       if (isPilotChrome(child.pid!, dir)) break;

@@ -167,10 +167,12 @@ across sessions:
   - `locked_other_host`: the lock was created on another host.
   - `locked_unknown`: Pilot cannot read the lock's owner.
 - `browser_stop_all` stops this session's browser, then every Chrome on this
-  host that holds a Pilot profile lock. Before signalling a process, it checks
-  that its command line contains `--user-data-dir=<that profile's
-directory>`. A reused pid or an unrelated process is never stopped. It also
-  removes stale locks. Locks from other hosts and locks with no readable owner
+  host that holds a Pilot profile lock. Before each signal, it checks that the
+  process is a Chrome or Chromium executable and that its command line has the
+  exact argument `--user-data-dir=<that profile's directory>`. A reused pid or
+  an unrelated process is never stopped. A browser is reported as stopped only
+  after it has exited, and a lock that cannot be removed is reported as failed.
+  It also removes stale locks. Locks from other hosts and locks with no readable owner
   are reported and left in place. It can close browsers that other agents are
   using, so confirm with the user first.
 

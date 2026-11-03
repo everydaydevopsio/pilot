@@ -1,7 +1,7 @@
 import { execFileSync } from 'child_process';
 import { existsSync, lstatSync, readdirSync, statSync } from 'fs';
 import { hostname } from 'os';
-import { dirname, join } from 'path';
+import { basename, dirname, join } from 'path';
 import {
   PROFILE_NAME_RE,
   cleanupLockFiles,
@@ -102,32 +102,48 @@ function lockPresent(path: string): boolean {
   }
 }
 
-/** The full command line of a process, or null when it cannot be read. */
-export function readProcessCommand(pid: number): string | null {
+function ps(pid: number, field: 'args' | 'comm'): string | null {
   if (process.platform === 'win32') return null;
   try {
-    return execFileSync('ps', ['-o', 'args=', '-p', String(pid)], {
+    const out = execFileSync('ps', ['-o', `${field}=`, '-p', String(pid)], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore']
     }).trim();
+    return out || null;
   } catch {
     return null;
   }
 }
 
+/** The full command line of a process, or null when it cannot be read. */
+export function readProcessCommand(pid: number): string | null {
+  return ps(pid, 'args');
+}
+
+// Chrome's main executable: "chrome" or "chromium-browser" on Linux (comm is
+// truncated to 15 characters), "Google Chrome" or "Chromium" on macOS.
+const CHROME_EXECUTABLE_RE = /chrom(e|ium)/i;
+
 /**
- * Whether pid is a browser started with this Pilot profile directory. A pid
- * read from a lock can be reused by an unrelated process, so stop-all only
- * signals processes whose command line names the profile.
+ * Whether pid is a Chrome or Chromium browser started with exactly this Pilot
+ * profile directory. A pid read from a lock can be reused by an unrelated
+ * process, so stop-all only signals processes that pass this check.
  */
 export function isPilotChrome(pid: number, userDataDir: string): boolean {
+  const executable = ps(pid, 'comm');
+  if (!executable || !CHROME_EXECUTABLE_RE.test(basename(executable))) {
+    return false;
+  }
   const command = readProcessCommand(pid);
   if (!command) return false;
-  const flag = `--user-data-dir=${userDataDir}`;
-  const at = command.indexOf(flag);
-  if (at === -1) return false;
-  const next = command.charAt(at + flag.length);
-  return next === '' || next === ' ';
+  const flag = ` --user-data-dir=${userDataDir}`;
+  let at = command.indexOf(flag);
+  while (at !== -1) {
+    const next = command.charAt(at + flag.length);
+    if (next === '' || next === ' ') return true;
+    at = command.indexOf(flag, at + 1);
+  }
+  return false;
 }
 
 export interface StopResult {
@@ -212,15 +228,25 @@ export async function stopPilotBrowsers(): Promise<StopResult[]> {
     switch (status.state) {
       case 'unlocked':
         continue;
-      case 'stale':
-        cleanupLockFiles(status.userDataDir, pid!);
-        results.push({
-          profile,
-          pid,
-          outcome: 'cleaned',
-          detail: `removed stale lock left by pid ${pid}, which is no longer running`
-        });
+      case 'stale': {
+        const removed = cleanupLockFiles(status.userDataDir, pid!);
+        results.push(
+          removed
+            ? {
+                profile,
+                pid,
+                outcome: 'cleaned',
+                detail: `removed stale lock left by pid ${pid}, which is no longer running`
+              }
+            : {
+                profile,
+                pid,
+                outcome: 'failed',
+                detail: `stale lock left by pid ${pid} could not be removed (the lock changed owner or is not writable)`
+              }
+        );
         continue;
+      }
       case 'locked_other_host':
         results.push({
           profile,
@@ -261,11 +287,13 @@ export async function stopLockedProfile(
   if (result.outcome === 'failed') {
     return { profile, pid, outcome: 'failed', detail: result.detail };
   }
-  cleanupLockFiles(userDataDir, pid);
+  const removed = cleanupLockFiles(userDataDir, pid);
   return {
     profile,
     pid,
     outcome: 'stopped',
-    detail: `stopped Chrome pid ${pid}`
+    detail: removed
+      ? `stopped Chrome pid ${pid}`
+      : `stopped Chrome pid ${pid}, but its lock could not be removed`
   };
 }
