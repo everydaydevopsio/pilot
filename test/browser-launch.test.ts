@@ -141,19 +141,25 @@ describe('BrowserManager.launch startup failures', () => {
         chromePath,
         headless: true,
         profileName: 'timeout',
-        startupTimeoutMs: 1000
+        // Long enough for the fake to take the lock even on a loaded machine.
+        startupTimeoutMs: 3000
       });
     } catch (err) {
       error = err as Error;
     }
 
-    const pid = Number(readFileSync(join(workDir, 'chrome.pid'), 'utf8'));
-    expect(error?.message).toMatch(/did not become ready/);
-    expect(error?.message).toContain(
+    expect(error).toBeDefined();
+    const message = error!.message;
+    expect(message).toMatch(/did not become ready/);
+    // The pid comes from the error, so this cannot race the fake's pid file.
+    const pid = Number(message.match(/launched \(pid (\d+)\)/)?.[1]);
+    expect(pid).toBeGreaterThan(0);
+    expect(Number(readFileSync(join(workDir, 'chrome.pid'), 'utf8'))).toBe(pid);
+    expect(message).toContain(
       `Pilot stopped the Chrome process it launched (pid ${pid}); profile "timeout" is free to reuse.`
     );
-    expect(error?.message).toMatch(/larger startupTimeoutMs/);
-    expect(error?.message).toMatch(/mode=headless/);
+    expect(message).toMatch(/larger startupTimeoutMs/);
+    expect(message).toMatch(/mode=headless/);
     expect(isProcessAlive(pid)).toBe(false);
     expect(isProfileLocked(resolveUserDataDir('timeout'))).toBe(false);
     expect(manager!.isLaunched()).toBe(false);
