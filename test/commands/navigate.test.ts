@@ -25,7 +25,8 @@ function fakeClient(opts: { href?: string; status?: number } = {}) {
     Page: {
       navigate,
       loadEventFired: (cb: Cb) => (listeners.loadEventFired = cb),
-      domContentEventFired: (cb: Cb) => (listeners.domContentEventFired = cb)
+      domContentEventFired: (cb: Cb) => (listeners.domContentEventFired = cb),
+      frameNavigated: () => () => undefined
     },
     Network: {
       responseReceived: (cb: Cb) => {
@@ -123,6 +124,8 @@ describe('executeNavigate', () => {
 
   describe('status', () => {
     type ResponseEvent = {
+      // Main-frame document commit (Page.frameNavigated) instead of a response.
+      commit?: boolean;
       loaderId: string;
       frameId?: string;
       type: string;
@@ -133,19 +136,36 @@ describe('executeNavigate', () => {
     // like a page whose subresources finish after the document.
     function clientWithResponses(responses: ResponseEvent[], loaderId = 'l1') {
       let onResponse: ((e: ResponseEvent) => void) | undefined;
+      let onCommit: Cb | undefined;
       let onLoad: Cb | undefined;
       const unsubscribe = jest.fn();
       const client = {
         Page: {
           navigate: jest.fn(async () => {
             setImmediate(() => {
-              for (const r of responses) onResponse?.(r);
+              for (const r of responses) {
+                if (r.commit) {
+                  onCommit?.({
+                    frame: {
+                      id: r.frameId,
+                      loaderId: r.loaderId,
+                      parentId: r.frameId === 'f1' ? undefined : 'f1'
+                    }
+                  });
+                } else {
+                  onResponse?.(r);
+                }
+              }
               onLoad?.();
             });
             return { frameId: 'f1', loaderId };
           }),
           loadEventFired: (cb: Cb) => (onLoad = cb),
-          domContentEventFired: () => undefined
+          domContentEventFired: () => undefined,
+          frameNavigated: (cb: Cb) => {
+            onCommit = cb;
+            return () => undefined;
+          }
         },
         Network: {
           responseReceived: (cb: (e: ResponseEvent) => void) => {
@@ -218,6 +238,63 @@ describe('executeNavigate', () => {
         'l2'
       );
       await expect(navigateTo(client)).resolves.toHaveProperty('status', 201);
+    });
+
+    it('reports the final document after a client-side redirect before load', async () => {
+      const { client } = clientWithResponses([
+        {
+          loaderId: 'l1',
+          frameId: 'f1',
+          type: 'Document',
+          response: { url: 'https://a.test/start/', status: 200 }
+        },
+        {
+          commit: true,
+          loaderId: 'l1',
+          frameId: 'f1',
+          type: 'Document',
+          response: { url: '', status: 0 }
+        },
+        {
+          loaderId: 'l2',
+          frameId: 'f1',
+          type: 'Document',
+          response: { url: 'https://a.test/missing/', status: 404 }
+        },
+        {
+          commit: true,
+          loaderId: 'l2',
+          frameId: 'f1',
+          type: 'Document',
+          response: { url: '', status: 0 }
+        }
+      ]);
+      await expect(navigateTo(client)).resolves.toHaveProperty('status', 404);
+    });
+
+    it('ignores commits from child frames', async () => {
+      const { client } = clientWithResponses([
+        {
+          loaderId: 'l1',
+          frameId: 'f1',
+          type: 'Document',
+          response: { url: 'https://a.test/missing/', status: 404 }
+        },
+        {
+          loaderId: 'l9',
+          frameId: 'child',
+          type: 'Document',
+          response: { url: 'https://ads.test/', status: 200 }
+        },
+        {
+          commit: true,
+          loaderId: 'l9',
+          frameId: 'child',
+          type: 'Document',
+          response: { url: '', status: 0 }
+        }
+      ]);
+      await expect(navigateTo(client)).resolves.toHaveProperty('status', 404);
     });
 
     it('falls back to 200 when no document response is observed', async () => {

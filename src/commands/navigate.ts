@@ -32,13 +32,19 @@ export async function executeNavigate(
   }
 
   // Collect document responses so the status reported is the navigated page's,
-  // not whichever image or script happened to finish last.
+  // not whichever image or script happened to finish last. Track the last
+  // main-frame commit too, so a client-side redirect before load reports the
+  // document whose load we waited for rather than the one Page.navigate started.
   const documentResponses: Array<{
     loaderId: string;
     frameId?: string;
     status: number;
   }> = [];
-  const stopListening = client.Network.responseReceived((event) => {
+  let committedLoaderId: string | undefined;
+  const stopCommits = client.Page.frameNavigated(({ frame }) => {
+    if (!frame.parentId) committedLoaderId = frame.loaderId;
+  });
+  const stopResponses = client.Network.responseReceived((event) => {
     if (event.type === 'Document' && event.response.status) {
       documentResponses.push({
         loaderId: event.loaderId,
@@ -106,8 +112,11 @@ export async function executeNavigate(
       url: params.url
     });
     const { url } = await navigationPromise;
+    const byLoader = (id: string | undefined) =>
+      id ? documentResponses.find((r) => r.loaderId === id) : undefined;
     const document =
-      documentResponses.find((r) => loaderId && r.loaderId === loaderId) ??
+      byLoader(committedLoaderId) ??
+      byLoader(loaderId) ??
       documentResponses.filter((r) => r.frameId === frameId).at(-1);
     const result = { url, status: document?.status ?? 200 };
 
@@ -123,6 +132,7 @@ export async function executeNavigate(
 
     return result;
   } finally {
-    stopListening();
+    stopResponses();
+    stopCommits();
   }
 }
