@@ -459,7 +459,7 @@ When the flag is applied, the server emits a `warn`-level log on launch so opera
 # Unit tests
 pnpm run test
 
-# With coverage (50% threshold enforced)
+# With coverage (75% threshold enforced)
 pnpm run test:coverage
 
 # MCP E2E tests (requires Chrome installed)
