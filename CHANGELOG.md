@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.1] - 2026-11-04
+
+### Highlights
+
+Navigation now reports the status of the final committed main-frame document and reliably cleans up listeners and timeouts.
+
+### Fixes
+
+- **Accurate navigation status:** Uses the last committed main-frame document’s status rather than the most recent response, preventing unrelated responses from affecting the result. (#66)
+- **Navigation cleanup:** Releases the page listener and clears the timeout regardless of how navigation ends. (#66)
+
+### Changes
+
+- Clear the Jest cache before test runs and raise the coverage threshold to **75%**. (#64)
+- Allow **15 seconds** for session tests that launch real processes, reducing timing-related failures. (#64)
+
 ## [0.7.0] - 2026-11-04
 
 ### Highlights
