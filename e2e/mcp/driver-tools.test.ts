@@ -70,6 +70,23 @@ describe('MCP E2E: driver-backed tools', () => {
     expect(await evaluate('document.title')).toBe('entered');
   });
 
+  // #58 review: a password field's value must never reach the agent.
+  it('browser_snapshot and browser_find never expose password values', async () => {
+    await mcp.callTool('browser_navigate', {
+      url: dataUrl(`<label>Username <input id="u" /></label>
+        <label>Password <input id="p" type="password" /></label>`)
+    });
+    await evaluate(`document.getElementById('u').value = 'visible-user';
+      document.getElementById('p').value = 's3cret-pw'`);
+    const snapshot = mcp.getText(await mcp.callTool('browser_snapshot'));
+    const found = mcp.getText(
+      await mcp.callTool('browser_find', { name: 'Password' })
+    );
+    expect(snapshot).toContain('visible-user');
+    expect(snapshot).not.toContain('s3cret-pw');
+    expect(found).not.toContain('s3cret-pw');
+  });
+
   it('browser_scroll scrolls the page', async () => {
     await mcp.callTool('browser_navigate', {
       url: dataUrl('<div style="height:5000px">tall</div>')

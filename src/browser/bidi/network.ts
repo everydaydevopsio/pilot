@@ -129,6 +129,11 @@ export class BidiNetworkMonitor {
     this.buffer.push(record);
     this.bidiIds.set(id, event.request.request);
     this.pending.add(id);
+    // A request that starts during the quiet period restarts the idle wait.
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
   }
 
   onResponse(event: BidiNetworkEvent): void {

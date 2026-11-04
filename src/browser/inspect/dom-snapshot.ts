@@ -172,7 +172,8 @@ export const DOM_SNAPSHOT_FUNCTION = String.raw`function () {
 
     if (role === 'textbox' || role === 'searchbox' || role === 'spinbutton' || role === 'slider') {
       var value = el.isContentEditable && tag !== 'input' && tag !== 'textarea' ? el.textContent : el.value;
-      if (value) out.value = String(value);
+      // Never expose what was typed into a password field.
+      if (value && !(tag === 'input' && out.type === 'password')) out.value = String(value);
     } else if (role === 'combobox' && tag === 'select') {
       var opt = el.options[el.selectedIndex];
       if (opt && text(opt.textContent)) out.value = text(opt.textContent);

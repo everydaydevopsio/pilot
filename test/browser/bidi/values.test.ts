@@ -268,4 +268,28 @@ describe('BidiNetworkMonitor', () => {
     monitor.onError({ request: request('b'), errorText: 'x' });
     await expect(idle).resolves.toBeUndefined();
   });
+
+  // #58 review: a request starting inside the quiet period restarts the wait.
+  it('does not report idle while a request that started late is in flight', async () => {
+    jest.useFakeTimers();
+    try {
+      const monitor = new BidiNetworkMonitor(new NetworkBuffer());
+      monitor.onRequest({ request: request('a') });
+      let settled = false;
+      const idle = monitor.waitForIdle(10000).then(() => {
+        settled = true;
+      });
+      monitor.onResponse({ request: request('a') });
+      jest.advanceTimersByTime(300);
+      monitor.onRequest({ request: request('b') });
+      await jest.advanceTimersByTimeAsync(1000);
+      expect(settled).toBe(false);
+      monitor.onResponse({ request: request('b') });
+      await jest.advanceTimersByTimeAsync(500);
+      await idle;
+      expect(settled).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
