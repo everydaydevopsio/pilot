@@ -549,7 +549,7 @@ Sandbox is automatically disabled when running as root on Linux/Windows, or when
 | Startup time (Chrome reachable)  | < 2 s                                        |
 | Node.js version                  | ≥ 22 LTS                                     |
 | TypeScript strict mode           | required                                     |
-| Test coverage threshold          | 50% (lines, functions, branches, statements) |
+| Test coverage threshold          | 75% (lines, functions, branches, statements) |
 
 ---
 
@@ -619,7 +619,7 @@ pilot/
 14. Stale profile locks from dead processes are detected and cleaned up.
 15. All viewport presets produce correct device emulation (DPR, mobile UA, touch).
 16. `pilot init` writes a valid Claude Code skill file.
-17. All tests pass; TypeScript builds clean in strict mode; coverage meets 50% threshold.
+17. All tests pass; TypeScript builds clean in strict mode; coverage meets 75% threshold.
 18. Every MCP tool runs through a `BrowserDriver` and is gated on the driver's
     capabilities (see [Browser drivers](#browser-drivers)).
 

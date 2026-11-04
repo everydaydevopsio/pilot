@@ -11,7 +11,7 @@ This file provides guidance to Claude Code for working in this repository.
 - Primary CI workflows: `ci.yml`, `lint.yml`, `smoke.yml`, `e2e.yml`
 - Primary release/publish workflow: `publish.yml`
 - Build: `pnpm run build` — Test: `pnpm run test` — Lint: `pnpm run lint` — Coverage: `pnpm run test:coverage`
-- Coverage threshold: 50%
+- Coverage threshold: 75%
 
 ## Publishing
 

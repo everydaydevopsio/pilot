@@ -20,10 +20,10 @@ export default {
   collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts', '!src/mcp/index.ts'],
   coverageThreshold: {
     global: {
-      lines: 50,
-      functions: 50,
-      branches: 50,
-      statements: 50
+      lines: 75,
+      functions: 75,
+      branches: 75,
+      statements: 75
     }
   },
   coverageProvider: 'v8',
