@@ -25,6 +25,10 @@ import { registerBrowserTools } from '../src/mcp/tools/browser.js';
 
 const unix = process.platform === 'win32' ? describe.skip : describe;
 
+// These tests spawn and signal real processes; the 5s default flakes on a
+// loaded machine.
+jest.setTimeout(15000);
+
 unix('Pilot sessions', () => {
   const origXdg = process.env.XDG_DATA_HOME;
   let workDir: string;
