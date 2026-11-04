@@ -18,3 +18,4 @@
 
 - Always release by running the `publish.yml` workflow with a `release_type` of `patch`, `minor`, or `major`, for example `gh workflow run publish.yml -f release_type=patch`. The workflow computes the version, updates `package.json` and `CHANGELOG.md`, creates and pushes the tag, publishes to npm, and creates the GitHub release.
 - Do not create or push release tags directly, and do not bump the version in `package.json` or edit the release entries in `CHANGELOG.md` by hand.
+- Release tags and GitHub release names are the bare semver version with no `v` prefix, for example `0.7.1`, matching `package.json`. This overrides the `v`-prefixed tag guidance in the Ballast-generated `.claude/rules/publishing-*.md` files. `publish.yml` runs only from `workflow_dispatch`; pushing a tag does not trigger a release.
