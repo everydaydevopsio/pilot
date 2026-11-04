@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BROWSER_KINDS } from '../browser/driver/types.js';
 
 const ConfigSchema = z.object({
   cdpPort: z.number().int().min(1).max(65535).default(9222),
@@ -9,6 +10,8 @@ const ConfigSchema = z.object({
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
     .default('info'),
   chromePath: z.string().optional(),
+  firefoxPath: z.string().optional(),
+  browser: z.enum(BROWSER_KINDS).default('chrome'),
   headless: z.boolean().default(false),
   profileName: z.string().default('profile1'),
   viewport: z.string().default('desktop'),
@@ -22,6 +25,7 @@ export interface CliArgs {
   cdpHost?: string;
   logLevel?: string;
   chromePath?: string;
+  browser?: string;
   headless?: boolean;
   profileName?: string;
   viewport?: string;
@@ -42,6 +46,8 @@ export function loadConfig(cliArgs: CliArgs = {}): Config {
       : undefined,
     logLevel: process.env.PILOT_LOG_LEVEL,
     chromePath: process.env.PILOT_CHROME_PATH,
+    firefoxPath: process.env.PILOT_FIREFOX_PATH,
+    browser: process.env.PILOT_BROWSER?.toLowerCase(),
     headless:
       process.env.PILOT_HEADLESS !== undefined
         ? process.env.PILOT_HEADLESS === 'true' ||
@@ -62,6 +68,8 @@ export function loadConfig(cliArgs: CliArgs = {}): Config {
     cdpMaxRetryMs: env.cdpMaxRetryMs,
     logLevel: cliArgs.logLevel ?? env.logLevel,
     chromePath: cliArgs.chromePath ?? env.chromePath,
+    firefoxPath: env.firefoxPath,
+    browser: cliArgs.browser ?? env.browser,
     headless: cliArgs.headless ?? env.headless,
     profileName: cliArgs.profileName ?? env.profileName,
     viewport: cliArgs.viewport ?? env.viewport,

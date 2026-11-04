@@ -5,7 +5,7 @@ import {
   findElements,
   formatSnapshot
 } from '../browser/inspect/snapshot.js';
-import type { ElementInfo } from '../browser/inspect/types.js';
+import type { ElementInfo, SnapshotResult } from '../browser/inspect/types.js';
 
 export interface FindQuery {
   role?: string;
@@ -25,6 +25,14 @@ export async function executeFind(
 ): Promise<FindCommandResult> {
   // Always builds a fresh snapshot — no caching across calls
   const snapshot = await buildSnapshot(client, refMap);
+  return findInSnapshot(snapshot, query);
+}
+
+/** Filter a snapshot by query and format the matches; shared by every driver. */
+export function findInSnapshot(
+  snapshot: SnapshotResult,
+  query: FindQuery
+): FindCommandResult {
   const matched = findElements(snapshot, query);
 
   if (matched.length === 0) {

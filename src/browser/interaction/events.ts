@@ -20,17 +20,10 @@ export async function fireInputEvents(
 }
 
 /**
- * Set a form field value using the native setter for React compatibility,
- * then fire input/change events.
+ * Sets a form field value with the native setter (for React), then fires
+ * input/change events. Shared by every driver, so it must stay plain JS.
  */
-export async function setFieldValue(
-  client: Client,
-  objectId: string,
-  value: string
-): Promise<void> {
-  await client.Runtime.callFunctionOn({
-    objectId,
-    functionDeclaration: `function(newValue) {
+export const SET_FIELD_VALUE_FUNCTION = `function(newValue) {
       var tag = this.tagName.toLowerCase();
       if (tag === 'select') {
         // Select element — set by value
@@ -56,7 +49,20 @@ export async function setFieldValue(
       }
       this.dispatchEvent(new Event('input', { bubbles: true }));
       this.dispatchEvent(new Event('change', { bubbles: true }));
-    }`,
+    }`;
+
+/**
+ * Set a form field value using the native setter for React compatibility,
+ * then fire input/change events.
+ */
+export async function setFieldValue(
+  client: Client,
+  objectId: string,
+  value: string
+): Promise<void> {
+  await client.Runtime.callFunctionOn({
+    objectId,
+    functionDeclaration: SET_FIELD_VALUE_FUNCTION,
     arguments: [{ value }],
     awaitPromise: false
   });

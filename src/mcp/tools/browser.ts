@@ -9,6 +9,7 @@ import {
 } from '../../browser/sessions.js';
 import { VIEWPORT_PRESETS } from '../../viewport.js';
 import { requireDriver } from './driver-context.js';
+import { BROWSER_KINDS, BROWSER_NAMES } from '../../browser/driver/types.js';
 
 // Raw shapes for MCP SDK (expects ZodRawShape, not ZodObject)
 
@@ -120,21 +121,33 @@ const waitShape = {
 };
 
 const startShape = {
+  browser: z
+    .enum(BROWSER_KINDS)
+    .optional()
+    .describe(
+      'Browser to launch: chrome (CDP) or firefox (WebDriver BiDi). Defaults to PILOT_BROWSER or "chrome". Firefox does not support browser_performance and reports computed styles without matched CSS rules.'
+    ),
   headless: z
     .boolean()
     .optional()
     .describe(
-      'Run Chrome headless. When omitted, falls back to PILOT_HEADLESS (accepts true/1 or false/0; default: false).'
+      'Run the browser headless. When omitted, falls back to PILOT_HEADLESS (accepts true/1 or false/0; default: false).'
     ),
   chromePath: z
     .string()
     .optional()
     .describe('Path to Chrome executable (auto-detected if omitted)'),
+  firefoxPath: z
+    .string()
+    .optional()
+    .describe(
+      'Path to the Firefox executable (auto-detected if omitted; PILOT_FIREFOX_PATH also overrides)'
+    ),
   profileName: z
     .string()
     .optional()
     .describe(
-      'Browser profile name. Data is stored under $XDG_DATA_HOME/pilot/<profileName>/ (default: ~/.local/share/pilot/<profileName>/). Defaults to PILOT_PROFILE_NAME env var or "profile1".'
+      'Browser profile name. Chrome data is stored under $XDG_DATA_HOME/pilot/<profileName>/ and Firefox data under $XDG_DATA_HOME/pilot/firefox/<profileName>/ (default XDG_DATA_HOME: ~/.local/share). Defaults to PILOT_PROFILE_NAME env var or "profile1".'
     ),
   viewport: z
     .enum(Object.keys(VIEWPORT_PRESETS) as [string, ...string[]])
@@ -175,7 +188,7 @@ const startShape = {
     .positive()
     .default(DEFAULT_STARTUP_TIMEOUT_MS)
     .describe(
-      `Timeout waiting for Chrome DevTools to become ready, in milliseconds. Defaults to ${DEFAULT_STARTUP_TIMEOUT_MS}. Startup fails immediately if Chrome exits, so raising this only helps when Chrome is slow to start (for example a first run on a Linux server with software rendering).`
+      `Timeout waiting for the browser's debugging endpoint (Chrome DevTools or Firefox WebDriver BiDi) to become ready, in milliseconds. Defaults to ${DEFAULT_STARTUP_TIMEOUT_MS}. Startup fails immediately if the browser exits, so raising this only helps when it is slow to start (for example a first run on a Linux server with software rendering).`
     )
 };
 
@@ -237,11 +250,13 @@ export function registerBrowserTools(
 ): void {
   server.tool(
     'browser_start',
-    'Launch the Chrome browser. Call this before using any other browser tools.',
+    'Launch a browser (Chrome by default, or Firefox with browser: "firefox"). Call this before using any other browser tools.',
     startShape,
     async ({
+      browser,
       headless,
       chromePath,
+      firefoxPath,
       profileName,
       viewport,
       viewportWidth,
@@ -266,11 +281,12 @@ export function registerBrowserTools(
         context.driver = null;
       }
 
-      const driver = makeDriver();
+      const driver = makeDriver(browser);
       const { headless: effectiveHeadless, viewport: effectiveViewport } =
         await driver.launch({
           headless,
           chromePath,
+          firefoxPath,
           profileName,
           viewport,
           viewportWidth,
@@ -285,7 +301,7 @@ export function registerBrowserTools(
         content: [
           {
             type: 'text' as const,
-            text: `Browser started${effectiveHeadless ? ' (headless)' : ' (visible)'}, viewport: ${effectiveViewport}.`
+            text: `Browser started (${driver.kind}${effectiveHeadless ? ', headless' : ', visible'}), viewport: ${effectiveViewport}.`
           }
         ]
       };
@@ -294,7 +310,7 @@ export function registerBrowserTools(
 
   server.tool(
     'browser_stop',
-    'Stop the Chrome browser and free all resources.',
+    'Stop the browser and free all resources.',
     {},
     async () => {
       if (!context.driver) {
@@ -302,7 +318,7 @@ export function registerBrowserTools(
           content: [
             {
               type: 'text' as const,
-              text: 'Browser is not running. This Pilot session is not tracking a launched or connected browser; a failed browser_start stops the Chrome it launched and reports the outcome in its error.'
+              text: 'Browser is not running. This Pilot session is not tracking a launched or connected browser; a failed browser_start stops the browser it launched and reports the outcome in its error.'
             }
           ]
         };
@@ -340,7 +356,7 @@ export function registerBrowserTools(
 
   server.tool(
     'browser_stop_all',
-    'Stop every Pilot-managed Chrome on this machine: the browser in this session plus any Chrome holding a Pilot profile lock, including ones started by other Pilot sessions. Only processes whose command line shows Chrome using a Pilot profile directory are stopped; browsers on other hosts and unverifiable locks are skipped. Also removes stale locks. Ask the user before calling this, since it can close browsers other agents are using.',
+    'Stop every Pilot-managed browser on this machine: the browser in this session plus any Chrome or Firefox holding a Pilot profile lock, including ones started by other Pilot sessions. Only processes whose command line shows that browser using a Pilot profile directory are stopped; browsers on other hosts and unverifiable locks are skipped. Also removes stale locks. Ask the user before calling this, since it can close browsers other agents are using.',
     {},
     async () => {
       const lines: string[] = [];
@@ -350,11 +366,11 @@ export function registerBrowserTools(
         context.driver = null;
         if (info.mode === 'launched') {
           lines.push(
-            `this session: stopped Chrome pid ${info.pid} (profile "${info.profile}")`
+            `this session: stopped ${BROWSER_NAMES[info.browser ?? 'chrome']} pid ${info.pid} (profile "${info.profile}")`
           );
         } else if (info.mode === 'external') {
           lines.push(
-            `this session: disconnected from ${info.host}:${info.cdpPort} (not stopped; Pilot did not launch it)`
+            `this session: disconnected from ${info.host}:${info.cdpPort ?? info.bidiPort} (not stopped; Pilot did not launch it)`
           );
         }
       }

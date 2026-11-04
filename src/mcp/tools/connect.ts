@@ -2,19 +2,28 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { BrowserContext, DriverFactory } from '../server.js';
 import { executeConnect, formatConnectResult } from '../../commands/connect.js';
+import { BROWSER_KINDS } from '../../browser/driver/types.js';
 
 const connectShape = {
+  browser: z
+    .enum(BROWSER_KINDS)
+    .optional()
+    .describe(
+      'Browser to connect to: chrome (CDP) or firefox (WebDriver BiDi). Defaults to PILOT_BROWSER or "chrome".'
+    ),
   host: z
     .string()
     .default('127.0.0.1')
-    .describe('Chrome debugging host (default: 127.0.0.1)'),
+    .describe('Debugging host (default: 127.0.0.1)'),
   port: z
     .number()
     .int()
     .min(1)
     .max(65535)
     .default(9222)
-    .describe('Chrome debugging port (default: 9222)')
+    .describe(
+      'Debugging port: the --remote-debugging-port the browser was started with (default: 9222)'
+    )
 };
 
 export function registerConnectTools(
@@ -24,9 +33,9 @@ export function registerConnectTools(
 ): void {
   server.tool(
     'browser_connect',
-    'Connect to an existing Chrome instance with remote debugging enabled. Start Chrome with --remote-debugging-port=PORT, then use this tool to connect. Lists available tabs after connecting. Use browser_switch_tab to select a specific tab.',
+    'Connect to an existing Chrome or Firefox with remote debugging enabled. Start the browser with --remote-debugging-port=PORT, then use this tool to connect (pass browser: "firefox" for Firefox, which serves WebDriver BiDi on that port). Lists available tabs after connecting. Use browser_switch_tab to select a specific tab.',
     connectShape,
-    async ({ host, port }) => {
+    async ({ browser, host, port }) => {
       if (context.driver?.isConnected()) {
         return {
           content: [
@@ -43,7 +52,7 @@ export function registerConnectTools(
         context.driver = null;
       }
 
-      const driver = makeDriver();
+      const driver = makeDriver(browser);
       try {
         const result = await executeConnect(driver, { host, port });
         context.driver = driver;

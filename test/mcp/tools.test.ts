@@ -466,7 +466,7 @@ describe('session lifecycle', () => {
     const { context, makeDriver, text } = setup({ next });
     await expect(
       text('browser_start', { headless: true, startupTimeoutMs: 1000 })
-    ).resolves.toBe('Browser started (headless), viewport: desktop.');
+    ).resolves.toBe('Browser started (chrome, headless), viewport: desktop.');
     expect(makeDriver).toHaveBeenCalledTimes(1);
     expect(next.launch).toHaveBeenCalledWith(
       expect.objectContaining({ headless: true, startupTimeoutMs: 1000 })
@@ -474,12 +474,66 @@ describe('session lifecycle', () => {
     expect(context.driver).toBe(next);
   });
 
+  // #58: browser_start and browser_connect pick the driver kind.
+  it('browser_start passes the requested browser to the factory', async () => {
+    const next = fakeDriver();
+    next.kind = 'firefox';
+    const { makeDriver, text } = setup({ next });
+    await expect(
+      text('browser_start', { browser: 'firefox', firefoxPath: '/opt/ff' })
+    ).resolves.toBe('Browser started (firefox, headless), viewport: desktop.');
+    expect(makeDriver).toHaveBeenCalledWith('firefox');
+    expect(next.launch).toHaveBeenCalledWith(
+      expect.objectContaining({ firefoxPath: '/opt/ff' })
+    );
+  });
+
+  it('browser_connect passes the requested browser to the factory', async () => {
+    const next = fakeDriver();
+    next.kind = 'firefox';
+    const { makeDriver, text } = setup({ next });
+    await expect(
+      text('browser_connect', { browser: 'firefox', host: 'h', port: 6000 })
+    ).resolves.toMatch(/^Connected to Firefox at h:6000/);
+    expect(makeDriver).toHaveBeenCalledWith('firefox');
+  });
+
+  it('browser_stop_all names a launched Firefox and an external BiDi port', async () => {
+    jest
+      .spyOn(await import('../../src/browser/sessions.js'), 'stopPilotBrowsers')
+      .mockResolvedValue([]);
+    const launched = fakeDriver();
+    launched.getSessionInfo.mockReturnValue({
+      browser: 'firefox',
+      mode: 'launched',
+      connected: true,
+      pid: 77,
+      profile: 'ff'
+    });
+    await expect(
+      setup({ driver: launched }).text('browser_stop_all')
+    ).resolves.toBe('this session: stopped Firefox pid 77 (profile "ff")');
+    const external = fakeDriver();
+    external.getSessionInfo.mockReturnValue({
+      browser: 'firefox',
+      mode: 'external',
+      connected: true,
+      host: '127.0.0.1',
+      bidiPort: 6000
+    });
+    await expect(
+      setup({ driver: external }).text('browser_stop_all')
+    ).resolves.toBe(
+      'this session: disconnected from 127.0.0.1:6000 (not stopped; Pilot did not launch it)'
+    );
+  });
+
   it('browser_start reports a visible browser', async () => {
     const next = fakeDriver();
     next.launch.mockResolvedValue({ headless: false, viewport: 'mobile' });
     const { text } = setup({ next });
     await expect(text('browser_start')).resolves.toBe(
-      'Browser started (visible), viewport: mobile.'
+      'Browser started (chrome, visible), viewport: mobile.'
     );
   });
 
