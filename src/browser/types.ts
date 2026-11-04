@@ -1,4 +1,5 @@
 import type { Client } from 'chrome-remote-interface';
+import type { BrowserKind } from './driver/types.js';
 
 export type BrowserEventCallback = (event: string, data: unknown) => void;
 
@@ -29,6 +30,8 @@ export interface LaunchOptions {
 }
 
 export interface SessionInfo {
+  /** Browser the session drives; set by the driver. */
+  browser?: BrowserKind;
   /** launched: Chrome started by this session; external: browser_connect. */
   mode: 'launched' | 'external' | 'none';
   connected: boolean;

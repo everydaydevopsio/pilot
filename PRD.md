@@ -79,13 +79,56 @@ as structured tool responses.
 claude mcp add pilot -- npx @everydaydevopsio/pilot
   └─ MCP stdio transport (stdin/stdout)
         └─ pilot process
-              ├─ BrowserManager (Chrome lifecycle)
-              │     ├─ Chrome launcher (auto-detect path, find free port)
-              │     ├─ CDP connection + reconnect with exponential backoff
-              │     └─ Profile management (~/.local/share/pilot/<name>/)
-              ├─ ConsoleBuffer (ring buffer, default 1000 entries)
+              ├─ MCP tools (capability-gated, call BrowserDriver only)
+              ├─ BrowserDriver (browser-agnostic interface)
+              │     └─ CdpDriver (Chrome over CDP)
+              │           └─ BrowserManager (Chrome lifecycle)
+              │                 ├─ Chrome launcher (auto-detect path, find free port)
+              │                 ├─ CDP connection + reconnect with exponential backoff
+              │                 └─ Profile management (~/.local/share/pilot/<name>/)
+              ├─ Session buffers (console, network, dialogs, downloads, element refs)
               └─ Pino logger (stderr, stdout reserved for MCP)
 ```
+
+### Browser drivers
+
+Tracking issue: [#62](https://github.com/everydaydevopsio/pilot/issues/62).
+
+MCP tools do not talk to a browser protocol directly. They call a
+`BrowserDriver` (`src/browser/driver/types.ts`), which exposes lifecycle, tab,
+page, inspection, input, file/dialog, and diagnostics operations using
+protocol-neutral parameter and result types. Each driver owns its protocol and
+fills the shared session buffers (console, network, dialogs, downloads, element
+refs) from browser events.
+
+- `CdpDriver` is the only driver today. It wraps `BrowserManager` and the CDP
+  command implementations under `src/commands/`, and supports every capability.
+- `createDriver(kind)` builds `CdpDriver` for `chrome`. `firefox`, `safari`, and
+  `webkit` fail with an error that links their tracking issues
+  ([#58](https://github.com/everydaydevopsio/pilot/issues/58),
+  [#59](https://github.com/everydaydevopsio/pilot/issues/59),
+  [#60](https://github.com/everydaydevopsio/pilot/issues/60),
+  [#61](https://github.com/everydaydevopsio/pilot/issues/61)).
+  There is no user-facing browser selection yet.
+- Every driver declares a capability set (`tabs`, `navigation`, `evaluate`,
+  `input`, `screenshot`, `viewport`, `accessibilitySnapshot`, `styles`,
+  `console`, `network`, `dialogs`, `uploads`, `downloads`, `performanceTrace`,
+  `connectExisting`). Every tool declares the capabilities it needs in
+  `TOOL_CAPABILITIES` (`src/browser/driver/capabilities.ts`).
+- All tools are registered through a capability gate. When a driver is active
+  and lacks a capability the tool needs, the tool fails before its handler
+  runs with `<tool> is not supported by <browser> (missing capabilities: ...)`.
+  Registering a tool with no `TOOL_CAPABILITIES` entry throws at startup.
+- `browser_status` reports the driven browser as `session.browser`.
+
+Acceptance criteria:
+
+- AC1: MCP tools do not import `chrome-remote-interface` or receive a CDP client.
+- AC2: `CdpDriver` supports every capability and every existing tool behaves as before (full E2E suite).
+- AC3: A tool whose capabilities the active driver lacks returns the capability error without calling the driver.
+- AC4: `createDriver` builds `CdpDriver` for `chrome` and reports the tracking issue for other browsers.
+- AC5: `browser_status` includes `session.browser`.
+- AC6: Unit tests cover the driver, the capability gate, the factory, and every tool's delegation; E2E covers every browser-dependent tool.
 
 ### Chrome lifecycle
 
@@ -516,6 +559,7 @@ Sandbox is automatically disabled when running as root on Linux/Windows, or when
 pilot/
 ├── src/
 │   ├── browser.ts              # BrowserManager: Chrome lifecycle, CDP, reconnect
+│   ├── browser/driver/         # BrowserDriver interface, CdpDriver, capabilities, factory
 │   ├── viewport.ts             # Viewport presets and emulation
 │   ├── commands/
 │   │   ├── screenshot.ts
@@ -576,6 +620,8 @@ pilot/
 15. All viewport presets produce correct device emulation (DPR, mobile UA, touch).
 16. `pilot init` writes a valid Claude Code skill file.
 17. All tests pass; TypeScript builds clean in strict mode; coverage meets 50% threshold.
+18. Every MCP tool runs through a `BrowserDriver` and is gated on the driver's
+    capabilities (see [Browser drivers](#browser-drivers)).
 
 ---
 
@@ -589,3 +635,5 @@ pilot/
 - DOM query/selection tool to reduce reliance on `browser_evaluate` for common tasks?
 - Cookie and localStorage management tools?
 - File upload/download handling via CDP?
+- Firefox (WebDriver BiDi), Safari (safaridriver), and WebKit (Playwright) drivers:
+  #58, #59, #60, #61.
