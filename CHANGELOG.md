@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.0] - 2026-11-04
+
+### Highlights
+
+- Browser MCP tools now run through a shared `BrowserDriver`, with capability checks to gate tool access based on driver support. (#63)
+
+### Fixes
+
+- No standalone bug fixes are included in this release.
+
+### Changes
+
+- Updated agent guidance to require releases through the `publish.yml` workflow. (#57)
+
+**Full changelog:** [0.6.3...0.7.0](../../compare/0.6.3...0.7.0)
+
 ## [0.6.3] - 2026-11-03
 
 This release adds browser session management tools and improves Chrome startup, recovery, and shutdown reliability.
