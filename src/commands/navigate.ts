@@ -31,81 +31,85 @@ export async function executeNavigate(
     );
   }
 
-  let finalStatus = 200;
-
-  const navigationPromise = new Promise<{ url: string; status: number }>(
-    (resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('timeout'));
-      }, params.timeoutMs);
-
-      const cleanup = () => clearTimeout(timeout);
-
-      if (params.waitUntil === 'load') {
-        client.Page.loadEventFired(() => {
-          cleanup();
-          client.Runtime.evaluate({ expression: 'window.location.href' }).then(
-            (r) => {
-              resolve({
-                url: (r.result.value as string) ?? params.url,
-                status: finalStatus
-              });
-            },
-            reject
-          );
-        });
-      } else if (params.waitUntil === 'domcontentloaded') {
-        client.Page.domContentEventFired(() => {
-          cleanup();
-          client.Runtime.evaluate({ expression: 'window.location.href' }).then(
-            (r) => {
-              resolve({
-                url: (r.result.value as string) ?? params.url,
-                status: finalStatus
-              });
-            },
-            reject
-          );
-        });
-      } else {
-        // networkidle
-        manager
-          .waitForNetworkIdle(params.timeoutMs)
-          .then(() => {
-            cleanup();
-            return client.Runtime.evaluate({
-              expression: 'window.location.href'
-            });
-          })
-          .then((r) => {
-            resolve({
-              url: (r.result.value as string) ?? params.url,
-              status: finalStatus
-            });
-          })
-          .catch((err: unknown) => {
-            cleanup();
-            reject(err);
-          });
-      }
+  // Collect document responses so the status reported is the navigated page's,
+  // not whichever image or script happened to finish last. Track the last
+  // main-frame commit too, so a client-side redirect before load reports the
+  // document whose load we waited for rather than the one Page.navigate started.
+  const documentResponses: Array<{
+    loaderId: string;
+    frameId?: string;
+    status: number;
+  }> = [];
+  let committedLoaderId: string | undefined;
+  const stopCommits = client.Page.frameNavigated(({ frame }) => {
+    if (!frame.parentId) committedLoaderId = frame.loaderId;
+  });
+  const stopResponses = client.Network.responseReceived((event) => {
+    if (event.type === 'Document' && event.response.status) {
+      documentResponses.push({
+        loaderId: event.loaderId,
+        frameId: event.frameId,
+        status: event.response.status
+      });
     }
-  );
+  });
 
-  // Capture the response status
-  const responseHandler = (params: {
-    response: { url: string; status: number };
-  }) => {
-    if (params.response.url === params.response.url && params.response.status) {
-      finalStatus = params.response.status;
+  // The timer and the page-event listener live outside the promise so the
+  // finally block can release them however the navigation ends, including
+  // when Page.navigate throws and the promise is never awaited.
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  let stopPageEvent: (() => void) | undefined;
+  const readHref = () =>
+    client.Runtime.evaluate({ expression: 'window.location.href' }).then(
+      (r) => ({ url: (r.result.value as string) ?? params.url })
+    );
+
+  const navigationPromise = new Promise<{ url: string }>((resolve, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error('timeout'));
+    }, params.timeoutMs);
+
+    const cleanup = () => clearTimeout(timeout);
+    const onPageEvent = () => {
+      cleanup();
+      readHref().then(resolve, reject);
+    };
+
+    if (params.waitUntil === 'load') {
+      stopPageEvent = client.Page.loadEventFired(onPageEvent);
+    } else if (params.waitUntil === 'domcontentloaded') {
+      stopPageEvent = client.Page.domContentEventFired(onPageEvent);
+    } else {
+      // networkidle
+      manager
+        .waitForNetworkIdle(params.timeoutMs)
+        .then(() => {
+          cleanup();
+          return readHref();
+        })
+        .then(resolve)
+        .catch((err: unknown) => {
+          cleanup();
+          reject(err);
+        });
     }
-  };
-  client.Network.responseReceived(responseHandler);
-
-  const { frameId } = await client.Page.navigate({ url: params.url });
-  void frameId; // used implicitly
+  });
+  // If Page.navigate throws, nothing awaits this promise; keep a late
+  // rejection from surfacing as an unhandled rejection.
+  navigationPromise.catch(() => undefined);
 
   try {
-    const result = await navigationPromise;
+    const { frameId, loaderId } = await client.Page.navigate({
+      url: params.url
+    });
+    const { url } = await navigationPromise;
+    const byLoader = (id: string | undefined) =>
+      id ? documentResponses.find((r) => r.loaderId === id) : undefined;
+    const document =
+      byLoader(committedLoaderId) ??
+      byLoader(loaderId) ??
+      documentResponses.filter((r) => r.frameId === frameId).at(-1);
+    const result = { url, status: document?.status ?? 200 };
 
     // Check final URL after redirects — block if redirected to a blocked origin
     const finalCheck = checkOrigin(result.url);
@@ -119,7 +123,9 @@ export async function executeNavigate(
 
     return result;
   } finally {
-    // Event listeners are auto-removed when client disconnects;
-    // for long-lived clients this is acceptable for v0.1
+    clearTimeout(timeout);
+    stopPageEvent?.();
+    stopResponses();
+    stopCommits();
   }
 }
