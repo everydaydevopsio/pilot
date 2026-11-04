@@ -5,7 +5,7 @@ describe('registerBrowserTools', () => {
     const launch = jest
       .fn()
       .mockResolvedValue({ headless: true, viewport: 'desktop' });
-    const manager = {
+    const driver = {
       isConnected: jest.fn().mockReturnValue(false),
       launch,
       destroy: jest.fn()
@@ -14,14 +14,14 @@ describe('registerBrowserTools', () => {
       tool: jest.fn()
     };
     const context = {
-      manager: null,
+      driver: null,
       consoleBuffer: null
     };
 
     registerBrowserTools(
       server as never,
       context as never,
-      () => manager as never
+      () => driver as never
     );
 
     const browserStart = server.tool.mock.calls.find(

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { BrowserContext } from '../server.js';
-import { executeDialog, formatDialogResult } from '../../commands/dialog.js';
-import { executeUpload } from '../../commands/upload.js';
+import { formatDialogResult } from '../../commands/dialog.js';
+import { requireDriver } from './driver-context.js';
 import {
   executeDownloads,
   formatDownloadsResult
@@ -49,15 +49,6 @@ const downloadsShape = {
     .describe('Timeout for wait action in milliseconds (default: 30000)')
 };
 
-function requireContext(context: BrowserContext) {
-  const manager = context.manager;
-  if (!manager || !manager.isConnected()) {
-    throw new Error('Browser not started. Call browser_start first.');
-  }
-  const client = manager.getClient()!;
-  return { client };
-}
-
 export function registerFilesTools(
   server: McpServer,
   context: BrowserContext
@@ -67,8 +58,7 @@ export function registerFilesTools(
     'Handle browser dialogs (alert, confirm, prompt). Use "list" to see pending dialogs, "accept" to click OK/Yes, or "dismiss" to click Cancel/No. For prompt dialogs, provide promptText with accept.',
     dialogShape,
     async ({ action, promptText }) => {
-      const { client } = requireContext(context);
-      const result = await executeDialog(client, context.dialogQueue, {
+      const result = await requireDriver(context).dialog({
         action,
         promptText
       });
@@ -83,8 +73,7 @@ export function registerFilesTools(
     'Upload files to a file input element by ref. Files must exist, be regular files, and be under allowed roots (PILOT_UPLOAD_ROOTS env, default: cwd). Use browser_snapshot to find file input refs.',
     uploadShape,
     async ({ ref, files }) => {
-      const { client } = requireContext(context);
-      const result = await executeUpload(client, context.elementRefMap, {
+      const result = await requireDriver(context).upload({
         ref,
         files
       });
@@ -104,7 +93,7 @@ export function registerFilesTools(
     'Track file downloads. Actions: "list" shows tracked downloads with status/progress; "wait" blocks until a download (by GUID) completes; "clear" resets the tracker.',
     downloadsShape,
     async ({ action, guid, timeoutMs }) => {
-      requireContext(context);
+      requireDriver(context);
       const result = await executeDownloads(context.downloadTracker, {
         action,
         guid,

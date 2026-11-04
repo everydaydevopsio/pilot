@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { BrowserContext } from '../server.js';
-import type { BrowserManager } from '../../browser/browser-manager.js';
+import type { BrowserContext, DriverFactory } from '../server.js';
 import { executeConnect, formatConnectResult } from '../../commands/connect.js';
 
 const connectShape = {
@@ -21,14 +20,14 @@ const connectShape = {
 export function registerConnectTools(
   server: McpServer,
   context: BrowserContext,
-  makeBrowserManager: () => BrowserManager
+  makeDriver: DriverFactory
 ): void {
   server.tool(
     'browser_connect',
     'Connect to an existing Chrome instance with remote debugging enabled. Start Chrome with --remote-debugging-port=PORT, then use this tool to connect. Lists available tabs after connecting. Use browser_switch_tab to select a specific tab.',
     connectShape,
     async ({ host, port }) => {
-      if (context.manager?.isConnected()) {
+      if (context.driver?.isConnected()) {
         return {
           content: [
             {
@@ -39,22 +38,22 @@ export function registerConnectTools(
         };
       }
 
-      if (context.manager) {
-        await context.manager.destroy();
-        context.manager = null;
+      if (context.driver) {
+        await context.driver.destroy();
+        context.driver = null;
       }
 
-      const manager = makeBrowserManager();
+      const driver = makeDriver();
       try {
-        const result = await executeConnect(manager, { host, port });
-        context.manager = manager;
+        const result = await executeConnect(driver, { host, port });
+        context.driver = driver;
         return {
           content: [
             { type: 'text' as const, text: formatConnectResult(result) }
           ]
         };
       } catch (err) {
-        await manager.destroy();
+        await driver.destroy();
         throw err;
       }
     }

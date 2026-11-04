@@ -1,32 +1,14 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { Client } from 'chrome-remote-interface';
-import type { BrowserManager } from '../../browser.js';
-import type { BrowserContext } from '../server.js';
+import type { BrowserContext, DriverFactory } from '../server.js';
 import { DEFAULT_STARTUP_TIMEOUT_MS } from '../../browser/chrome-launcher.js';
 import {
   listProfiles,
   pilotDataDir,
   stopPilotBrowsers
 } from '../../browser/sessions.js';
-import { executeScreenshot } from '../../commands/screenshot.js';
-import { executeNavigate } from '../../commands/navigate.js';
-import { executeClick } from '../../commands/click.js';
-import { executeType } from '../../commands/type.js';
-import { executeEvaluate } from '../../commands/evaluate.js';
-import { executeWait } from '../../commands/wait.js';
-import { executePageInfo } from '../../commands/page_info.js';
-import {
-  executeListTabs,
-  executeNewTab,
-  executeCloseTab,
-  executeSwitchTab
-} from '../../commands/tabs.js';
-import {
-  VIEWPORT_PRESETS,
-  applyViewport,
-  type ViewportConfig
-} from '../../viewport.js';
+import { VIEWPORT_PRESETS } from '../../viewport.js';
+import { requireDriver } from './driver-context.js';
 
 // Raw shapes for MCP SDK (expects ZodRawShape, not ZodObject)
 
@@ -248,22 +230,10 @@ const viewportResizeShape = {
     )
 };
 
-function requireClient(context: BrowserContext): {
-  client: Client;
-  manager: BrowserManager;
-} {
-  const manager = context.manager;
-  if (!manager || !manager.isConnected()) {
-    throw new Error('Browser not started. Call browser_start first.');
-  }
-  const client = manager.getClient()!;
-  return { client, manager };
-}
-
 export function registerBrowserTools(
   server: McpServer,
   context: BrowserContext,
-  makeBrowserManager: () => BrowserManager
+  makeDriver: DriverFactory
 ): void {
   server.tool(
     'browser_start',
@@ -280,7 +250,7 @@ export function registerBrowserTools(
       responsive,
       startupTimeoutMs
     }) => {
-      if (context.manager?.isConnected()) {
+      if (context.driver?.isConnected()) {
         return {
           content: [
             {
@@ -291,14 +261,14 @@ export function registerBrowserTools(
         };
       }
 
-      if (context.manager) {
-        await context.manager.destroy();
-        context.manager = null;
+      if (context.driver) {
+        await context.driver.destroy();
+        context.driver = null;
       }
 
-      const manager = makeBrowserManager();
+      const driver = makeDriver();
       const { headless: effectiveHeadless, viewport: effectiveViewport } =
-        await manager.launch({
+        await driver.launch({
           headless,
           chromePath,
           profileName,
@@ -309,7 +279,7 @@ export function registerBrowserTools(
           responsive,
           startupTimeoutMs
         });
-      context.manager = manager;
+      context.driver = driver;
 
       return {
         content: [
@@ -327,7 +297,7 @@ export function registerBrowserTools(
     'Stop the Chrome browser and free all resources.',
     {},
     async () => {
-      if (!context.manager) {
+      if (!context.driver) {
         return {
           content: [
             {
@@ -338,8 +308,8 @@ export function registerBrowserTools(
         };
       }
 
-      await context.manager.destroy();
-      context.manager = null;
+      await context.driver.destroy();
+      context.driver = null;
 
       return {
         content: [{ type: 'text' as const, text: 'Browser stopped.' }]
@@ -353,7 +323,7 @@ export function registerBrowserTools(
     {},
     async () => {
       const status = {
-        session: context.manager?.getSessionInfo() ?? {
+        session: context.driver?.getSessionInfo() ?? {
           mode: 'none',
           connected: false
         },
@@ -374,10 +344,10 @@ export function registerBrowserTools(
     {},
     async () => {
       const lines: string[] = [];
-      if (context.manager) {
-        const info = context.manager.getSessionInfo();
-        await context.manager.destroy();
-        context.manager = null;
+      if (context.driver) {
+        const info = context.driver.getSessionInfo();
+        await context.driver.destroy();
+        context.driver = null;
         if (info.mode === 'launched') {
           lines.push(
             `this session: stopped Chrome pid ${info.pid} (profile "${info.profile}")`
@@ -410,8 +380,7 @@ export function registerBrowserTools(
     'Capture a screenshot of the current browser viewport or full page',
     screenshotShape,
     async ({ format, quality, fullPage }) => {
-      const { client } = requireClient(context);
-      const result = await executeScreenshot(client, {
+      const result = await requireDriver(context).screenshot({
         format,
         quality,
         fullPage
@@ -446,8 +415,7 @@ export function registerBrowserTools(
     'Navigate to a URL and wait for page load',
     navigateShape,
     async ({ url, waitUntil, timeoutMs }) => {
-      const { client, manager } = requireClient(context);
-      const result = await executeNavigate(client, manager, {
+      const result = await requireDriver(context).navigate({
         url,
         waitUntil,
         timeoutMs
@@ -485,8 +453,7 @@ export function registerBrowserTools(
         };
       }
 
-      const { client } = requireClient(context);
-      const result = await executeClick(client, params, context.elementRefMap);
+      const result = await requireDriver(context).click(params);
 
       return {
         content: [
@@ -504,8 +471,7 @@ export function registerBrowserTools(
     'Type text into the focused element, a ref (from browser_snapshot), or a CSS selector. Generates keystroke events (use browser_fill to replace a field value entirely).',
     typeShape,
     async (params) => {
-      const { client } = requireClient(context);
-      await executeType(client, params, context.elementRefMap);
+      await requireDriver(context).type(params);
 
       const target = params.ref ?? params.selector;
       return {
@@ -524,8 +490,7 @@ export function registerBrowserTools(
     'Execute JavaScript in the page context and return the result',
     evaluateShape,
     async ({ expression, awaitPromise, timeoutMs }) => {
-      const { client } = requireClient(context);
-      const result = await executeEvaluate(client, {
+      const result = await requireDriver(context).evaluate({
         expression,
         awaitPromise,
         timeoutMs
@@ -568,8 +533,7 @@ export function registerBrowserTools(
         };
       }
 
-      const { client, manager } = requireClient(context);
-      const result = await executeWait(client, manager, params);
+      const result = await requireDriver(context).wait(params);
 
       return {
         content: [
@@ -587,8 +551,7 @@ export function registerBrowserTools(
     'Get information about the current page (URL, title, ready state)',
     {},
     async () => {
-      const { client } = requireClient(context);
-      const result = await executePageInfo(client);
+      const result = await requireDriver(context).pageInfo();
 
       return {
         content: [
@@ -606,8 +569,7 @@ export function registerBrowserTools(
     'List all open browser tabs with their target IDs, URLs, titles, and active status',
     {},
     async () => {
-      const { manager } = requireClient(context);
-      const tabs = await executeListTabs(manager);
+      const tabs = await requireDriver(context).listTabs();
 
       return {
         content: [
@@ -625,8 +587,7 @@ export function registerBrowserTools(
     'Open a new browser tab, optionally navigating to a URL',
     newTabShape,
     async ({ url }) => {
-      const { manager } = requireClient(context);
-      const result = await executeNewTab(manager, url);
+      const result = await requireDriver(context).newTab(url);
 
       return {
         content: [
@@ -644,8 +605,7 @@ export function registerBrowserTools(
     'Close a browser tab by its target ID. Cannot close the currently active tab.',
     closeTabShape,
     async ({ targetId }) => {
-      const { manager } = requireClient(context);
-      await executeCloseTab(manager, targetId);
+      await requireDriver(context).closeTab(targetId);
 
       return {
         content: [
@@ -663,8 +623,7 @@ export function registerBrowserTools(
     'Switch the active browser tab to the one with the given target ID. All subsequent commands will target this tab.',
     switchTabShape,
     async ({ targetId }) => {
-      const { manager } = requireClient(context);
-      await executeSwitchTab(manager, targetId);
+      await requireDriver(context).switchTab(targetId);
 
       return {
         content: [
@@ -682,22 +641,12 @@ export function registerBrowserTools(
     'Resize the browser viewport to new dimensions. Updates both the window size and the rendering viewport. Disables responsive mode so the viewport stays locked at the specified size.',
     viewportResizeShape,
     async ({ width, height, deviceScaleFactor, mobile }) => {
-      const { client, manager } = requireClient(context);
-
-      const current = manager.getViewportConfig();
-      const effectiveMobile = mobile ?? current?.mobile ?? false;
-      const newConfig: ViewportConfig = {
+      const newConfig = await requireDriver(context).resizeViewport({
         width,
         height,
-        deviceScaleFactor: deviceScaleFactor ?? current?.deviceScaleFactor ?? 1,
-        mobile: effectiveMobile,
-        responsive: false,
-        ...(effectiveMobile &&
-          current?.userAgent && { userAgent: current.userAgent })
-      };
-
-      await applyViewport(client, newConfig);
-      manager.setViewportConfig(newConfig);
+        deviceScaleFactor,
+        mobile
+      });
 
       return {
         content: [
@@ -715,11 +664,11 @@ export function registerBrowserTools(
     'Manage browser tabs. Actions: "list" shows all tabs, "new" opens a tab (optional url), "select" switches to a tab (requires targetId), "close" closes a tab (requires targetId).',
     tabsShape,
     async ({ action, targetId, url }) => {
-      const { manager } = requireClient(context);
+      const driver = requireDriver(context);
 
       switch (action) {
         case 'list': {
-          const tabs = await executeListTabs(manager);
+          const tabs = await driver.listTabs();
           return {
             content: [
               { type: 'text' as const, text: JSON.stringify(tabs, null, 2) }
@@ -728,7 +677,7 @@ export function registerBrowserTools(
         }
 
         case 'new': {
-          const result = await executeNewTab(manager, url);
+          const result = await driver.newTab(url);
           return {
             content: [
               {
@@ -751,7 +700,7 @@ export function registerBrowserTools(
               isError: true
             };
           }
-          await executeSwitchTab(manager, targetId);
+          await driver.switchTab(targetId);
           return {
             content: [
               {
@@ -774,7 +723,7 @@ export function registerBrowserTools(
               isError: true
             };
           }
-          await executeCloseTab(manager, targetId);
+          await driver.closeTab(targetId);
           return {
             content: [
               {

@@ -469,6 +469,22 @@ pnpm run test:e2e:mcp
 pnpm run test:e2e:mcp:docker
 ```
 
+## Browser Support
+
+Pilot drives Chrome today. MCP tools call a browser-agnostic `BrowserDriver`
+(`src/browser/driver/`); `CdpDriver` implements it for Chrome over the Chrome
+DevTools Protocol. Each driver declares capabilities, and a tool whose
+capabilities the active browser lacks fails with
+`<tool> is not supported by <browser>`. `browser_status` reports the driven
+browser as `session.browser`.
+
+Planned drivers: Firefox on macOS
+([#58](https://github.com/everydaydevopsio/pilot/issues/58)), Firefox on Linux
+and Windows ([#59](https://github.com/everydaydevopsio/pilot/issues/59)), Safari
+on macOS ([#60](https://github.com/everydaydevopsio/pilot/issues/60)), and
+WebKit via Playwright
+([#61](https://github.com/everydaydevopsio/pilot/issues/61)).
+
 ## Project Structure
 
 ```
@@ -478,6 +494,7 @@ src/
 │   ├── browser-manager.ts  # BrowserManager orchestrator
 │   ├── chrome-launcher.ts  # Chrome process management
 │   ├── connection.ts       # CDP connection + reconnect
+│   ├── driver/             # BrowserDriver interface, CdpDriver, capability gating
 │   ├── events.ts           # CDP event listeners
 │   ├── sessions.ts         # Profile lock status and stop-all
 │   ├── tabs.ts             # Tab management
@@ -488,8 +505,8 @@ src/
 │   ├── performance/        # Tracing + analysis
 │   └── security/           # Origin allow/block lists
 ├── cli/                    # CLI commands (init, Linux preflight)
-├── commands/               # Tool command implementations
-├── mcp/                    # MCP server + tool registrations
+├── commands/               # CDP command implementations used by CdpDriver
+├── mcp/                    # MCP server + tool registrations (call BrowserDriver only)
 └── util/                   # Config, logger
 ```
 

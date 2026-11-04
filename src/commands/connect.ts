@@ -1,4 +1,4 @@
-import type { BrowserManager } from '../browser/browser-manager.js';
+import type { BrowserDriver } from '../browser/driver/types.js';
 import type { TabInfo } from '../browser/types.js';
 
 export interface ConnectParams {
@@ -13,13 +13,13 @@ export interface ConnectResult {
 }
 
 export async function executeConnect(
-  manager: BrowserManager,
+  driver: Pick<BrowserDriver, 'connectExisting'>,
   params: ConnectParams
 ): Promise<ConnectResult> {
   const host = params.host ?? '127.0.0.1';
   const port = params.port ?? 9222;
 
-  const { tabs } = await manager.connectExisting({ host, port });
+  const { tabs } = await driver.connectExisting({ host, port });
 
   return { host, port, tabs };
 }

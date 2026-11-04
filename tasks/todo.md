@@ -1,58 +1,56 @@
-# Task: Use castoff for release notes
+# Task: BrowserDriver interface with CdpDriver and capability gating
 
 ## Context
 
 - Owner: mark
-- Date: 2026-10-01
-- Mode: Autonomous
-- Issue: https://github.com/everydaydevopsio/pilot/issues/37
+- Date: 2026-11-04
+- Mode: Autonomous (refactor, no behaviour change for Chrome)
+- PRD Section: Architecture → Browser drivers
+- Issue: https://github.com/everydaydevopsio/pilot/issues/62
 
 ## Scope
 
-- In scope: `.github/workflows/publish.yml` — generate release notes and the
-  `CHANGELOG.md` entry with castoff, drop `softprops/action-gh-release`.
-- Out of scope: the inconsistent tag convention (see Risks).
+- In scope: `BrowserDriver` interface, `CdpDriver`, capability model and gate,
+  driver factory, `session.browser` in `browser_status`, tests.
+- Out of scope: Firefox/Safari/WebKit drivers (#58–#61), user-facing browser
+  selection.
 
 ## Acceptance Criteria
 
-- AC1: `bump_and_tag` runs `castoff/castoff@v2` before the release commit and
-  exposes `release_notes` as a job output.
-- AC2: The release commit includes the `CHANGELOG.md` entry written by
-  `castoff/changelog@v2`.
-- AC3: `softprops/action-gh-release` is gone; the release body is the castoff
-  notes, falling back to `--generate-notes` on the tag-push path.
-- AC4: A patch release published from `main` produces a GitHub Release whose
-  body carries the Castoff attribution footer.
-
-## Risks and Tradeoffs
-
-- Risk: `workflow_dispatch` tags are unprefixed (`0.6.1`) while `push` only
-  triggers on `v*`, so the tag-push path is unreachable for workflow-produced
-  tags. Pre-existing; the `--generate-notes` fallback keeps it correct if the
-  trigger is ever fixed. Tracked separately.
-- Tradeoff: the release now hard-fails without `OPENAI_API_KEY` rather than
-  silently falling back, matching `ballast` and `bosun`.
+- AC1: MCP tools do not import `chrome-remote-interface` or receive a CDP client.
+- AC2: `CdpDriver` supports every capability; existing tools behave as before.
+- AC3: Missing capabilities fail with `<tool> is not supported by <browser>`
+  before the driver is called.
+- AC4: `createDriver` builds chrome and links tracking issues for the others.
+- AC5: `browser_status` includes `session.browser`.
+- AC6: Unit tests for driver, gate, factory, and tool delegation; E2E for every
+  browser-dependent tool.
 
 ## Execution Checklist
 
-- [x] Add castoff + changelog steps to `bump_and_tag`
-- [x] Replace `softprops/action-gh-release` with `gh release create`
-- [x] `actionlint` clean on `publish.yml`
-- [ ] Patch release published and release body verified
+- [x] Driver types, capabilities, factory, `CdpDriver`
+- [x] Port every MCP tool to `requireDriver` + capability gate
+- [x] Unit tests (driver, gate, factory, tools, network, navigate, runtime)
+- [x] E2E suite for previously uncovered tools (`e2e/mcp/driver-tools.test.ts`)
+- [x] PRD and README updated
 
 ## Test Strategy
 
-- Static: `actionlint .github/workflows/publish.yml`
-- Live: publish a patch release and inspect the resulting GitHub Release body
-  and `CHANGELOG.md` entry.
+- Unit: `test/browser/driver/*`, `test/mcp/driver-context.test.ts`,
+  `test/mcp/tools.test.ts`.
+- E2E: full MCP suite against real Chrome, plus `driver-tools.test.ts`.
+- Failure paths: missing capability, no browser, unsupported browser kind,
+  failed connect, invalid tab actions.
+- Requirement-to-test mapping: tests reference `#62 ACn` in describe comments.
 
 ## Rollback Strategy
 
-- Trigger: castoff step fails, or the release body is empty/malformed.
-- Rollback: revert the `publish.yml` commit; the previous `softprops` step
-  restores GitHub-generated notes.
-- Validation after rollback: re-run the publish workflow.
+- Trigger: any Chrome tool regression after release.
+- Rollback steps: revert the merge commit; no data or config migration.
+- Validation after rollback: E2E suite green.
 
 ## Outcome
 
-- Result: pending live release verification.
+- Result: unit 489 passed, 77.3% line coverage (main: 49.7%); E2E 85 passed.
+- Evidence: `pnpm run test:coverage`, `PILOT_HEADLESS=true pnpm exec jest --config jest.e2e-mcp.config.js`.
+- PRD updates: Architecture → Browser drivers; acceptance criterion 18.

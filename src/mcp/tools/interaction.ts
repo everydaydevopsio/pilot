@@ -1,21 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { BrowserContext } from '../server.js';
-import { executeFill } from '../../commands/fill.js';
-import { executeHover } from '../../commands/hover.js';
-import { executePressKey } from '../../commands/press_key.js';
-import { executeSelect } from '../../commands/select.js';
-import { executeCheck } from '../../commands/check.js';
-import { executeScroll } from '../../commands/scroll.js';
-
-function requireContext(context: BrowserContext) {
-  const manager = context.manager;
-  if (!manager || !manager.isConnected()) {
-    throw new Error('Browser not started. Call browser_start first.');
-  }
-  const client = manager.getClient()!;
-  return { client, refMap: context.elementRefMap };
-}
+import { requireDriver } from './driver-context.js';
 
 const fillShape = {
   ref: z.string().describe('Element ref from browser_snapshot (e.g. "e3")'),
@@ -81,8 +67,7 @@ export function registerInteractionTools(
     'Fill a form field by element ref. Replaces the entire field value and fires input/change events compatible with React, Vue, and Svelte. Use browser_snapshot first to get refs.',
     fillShape,
     async ({ ref, value }) => {
-      const { client, refMap } = requireContext(context);
-      const result = await executeFill(client, refMap, { ref, value });
+      const result = await requireDriver(context).fill({ ref, value });
       return {
         content: [
           {
@@ -113,8 +98,7 @@ export function registerInteractionTools(
           isError: true
         };
       }
-      const { client, refMap } = requireContext(context);
-      const result = await executeHover(client, refMap, params);
+      const result = await requireDriver(context).hover(params);
       return {
         content: [
           {
@@ -131,8 +115,7 @@ export function registerInteractionTools(
     'Press a key or key combination. Supports named keys (Enter, Tab, Escape, etc.) and modifier combos (Control+a, Meta+c, Shift+Enter).',
     pressKeyShape,
     async ({ key }) => {
-      const { client } = requireContext(context);
-      const result = await executePressKey(client, { key });
+      const result = await requireDriver(context).pressKey({ key });
       const modStr =
         result.modifiers.length > 0
           ? ` with modifiers: ${result.modifiers.join('+')}`
@@ -165,8 +148,7 @@ export function registerInteractionTools(
           isError: true
         };
       }
-      const { client, refMap } = requireContext(context);
-      const result = await executeSelect(client, refMap, params);
+      const result = await requireDriver(context).select(params);
       return {
         content: [
           {
@@ -183,8 +165,7 @@ export function registerInteractionTools(
     'Toggle a checkbox or radio button by ref. Optionally set to a specific checked state.',
     checkShape,
     async ({ ref, checked }) => {
-      const { client, refMap } = requireContext(context);
-      const result = await executeCheck(client, refMap, { ref, checked });
+      const result = await requireDriver(context).check({ ref, checked });
       return {
         content: [
           {
@@ -217,8 +198,7 @@ export function registerInteractionTools(
           isError: true
         };
       }
-      const { client, refMap } = requireContext(context);
-      const result = await executeScroll(client, refMap, params);
+      const result = await requireDriver(context).scroll(params);
       return {
         content: [
           {

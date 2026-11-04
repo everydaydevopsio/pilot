@@ -259,7 +259,7 @@ unix('Pilot sessions', () => {
     it('browser_status reports the session and profile states', async () => {
       lock(profileDir('remote'), 'other-host-4242');
       const tool = register({
-        manager: {
+        driver: {
           getSessionInfo: () => ({
             mode: 'launched',
             connected: true,
@@ -289,7 +289,7 @@ unix('Pilot sessions', () => {
 
       const destroy = jest.fn().mockResolvedValue(undefined);
       const context: Record<string, unknown> = {
-        manager: {
+        driver: {
           getSessionInfo: () => ({
             mode: 'launched',
             connected: true,
@@ -303,7 +303,7 @@ unix('Pilot sessions', () => {
 
       const text = (await tool('browser_stop_all')()).content[0].text;
       expect(destroy).toHaveBeenCalled();
-      expect(context.manager).toBeNull();
+      expect(context.driver).toBeNull();
       expect(text).toContain(
         'this session: stopped Chrome pid 321 (profile "profile1")'
       );
@@ -314,7 +314,7 @@ unix('Pilot sessions', () => {
     });
 
     it('browser_stop_all reports when nothing was running', async () => {
-      const tool = register({ manager: null });
+      const tool = register({ driver: null });
       const text = (await tool('browser_stop_all')()).content[0].text;
       expect(text).toBe('No Pilot-managed browsers were running.');
     });

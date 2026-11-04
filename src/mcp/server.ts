@@ -1,18 +1,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { BrowserManager } from '../browser.js';
+import { createDriver } from '../browser/driver/factory.js';
+import type { BrowserDriver, DriverSession } from '../browser/driver/types.js';
 import { ElementRefMap } from '../browser/inspect/element-ref.js';
-import { resetCssState } from '../browser/inspect/styles.js';
 import { DialogQueue } from '../browser/interaction/dialogs.js';
-import { attachDialogHandler } from '../browser/interaction/dialogs.js';
-import {
-  DownloadTracker,
-  enableDownloads,
-  attachDownloadHandler
-} from '../browser/interaction/downloads.js';
+import { DownloadTracker } from '../browser/interaction/downloads.js';
 import { NetworkBuffer } from '../browser/network/network-buffer.js';
-import { attachNetworkMonitor } from '../browser/network/network-monitor.js';
 import { loadConfig } from '../util/config.js';
-import { ConsoleBuffer, type ConsoleMessage } from './console-buffer.js';
+import { ConsoleBuffer } from './console-buffer.js';
 import { registerBrowserTools } from './tools/browser.js';
 import { registerErrorTools } from './tools/errors.js';
 import { registerSnapshotTools } from './tools/snapshot.js';
@@ -24,6 +18,7 @@ import { registerFilesTools } from './tools/files.js';
 import { createTraceState } from '../browser/performance/trace.js';
 import { registerPerformanceTools } from './tools/performance.js';
 import { registerConnectTools } from './tools/connect.js';
+import { withCapabilityGate } from './tools/driver-context.js';
 
 export interface McpConfig {
   bufferSize: number;
@@ -31,15 +26,33 @@ export interface McpConfig {
   cdpHost?: string;
 }
 
-export interface BrowserContext {
-  manager: BrowserManager | null;
-  consoleBuffer: ConsoleBuffer;
-  elementRefMap: ElementRefMap;
-  networkBuffer: NetworkBuffer;
-  dialogQueue: DialogQueue;
-  downloadTracker: DownloadTracker;
-  traceState: ReturnType<typeof createTraceState>;
+export interface BrowserContext extends DriverSession {
+  driver: BrowserDriver | null;
   baseConfig: McpConfig;
+}
+
+export type DriverFactory = () => BrowserDriver;
+
+/**
+ * Register every Pilot tool behind the capability gate, so a tool the active
+ * driver cannot support fails before its handler runs.
+ */
+export function registerAllTools(
+  server: McpServer,
+  context: BrowserContext,
+  makeDriver: DriverFactory
+): void {
+  const gated = withCapabilityGate(server, () => context.driver);
+  registerBrowserTools(gated, context, makeDriver);
+  registerErrorTools(gated, context.consoleBuffer);
+  registerSnapshotTools(gated, context);
+  registerInteractionTools(gated, context);
+  registerNetworkTools(gated, context);
+  registerRuntimeTools(gated, context.consoleBuffer);
+  registerStylesTools(gated, context);
+  registerFilesTools(gated, context);
+  registerPerformanceTools(gated, context);
+  registerConnectTools(gated, context, makeDriver);
 }
 
 export async function createMcpServer(config: McpConfig): Promise<{
@@ -51,88 +64,32 @@ export async function createMcpServer(config: McpConfig): Promise<{
     version: '0.1.0'
   });
 
-  const consoleBuffer = new ConsoleBuffer(config.bufferSize);
-  const elementRefMap = new ElementRefMap();
-  const networkBuffer = new NetworkBuffer();
-  const dialogQueue = new DialogQueue();
-  const downloadTracker = new DownloadTracker();
-  const traceState = createTraceState();
-
   const context: BrowserContext = {
-    manager: null,
-    consoleBuffer,
-    elementRefMap,
-    networkBuffer,
-    dialogQueue,
-    downloadTracker,
-    traceState,
+    driver: null,
+    consoleBuffer: new ConsoleBuffer(config.bufferSize),
+    elementRefMap: new ElementRefMap(),
+    networkBuffer: new NetworkBuffer(),
+    dialogQueue: new DialogQueue(),
+    downloadTracker: new DownloadTracker(),
+    traceState: createTraceState(),
     baseConfig: config
   };
 
-  function attachEventHandlers(manager: BrowserManager): void {
-    let monitoredClient: unknown = null;
+  const makeDriver: DriverFactory = () =>
+    createDriver(
+      'chrome',
+      loadConfig({ cdpPort: config.cdpPort, cdpHost: config.cdpHost }),
+      context
+    );
 
-    function ensureMonitors(): void {
-      const client = manager.getClient();
-      if (client && client !== monitoredClient) {
-        attachNetworkMonitor(client, networkBuffer);
-        attachDialogHandler(client, dialogQueue);
-        attachDownloadHandler(client, downloadTracker);
-        void enableDownloads(client).catch(() => {
-          // Download behavior setup may fail in some environments
-        });
-        monitoredClient = client;
-      }
-    }
-
-    manager.setEventCallback((event, data) => {
-      if (event === 'console_message') {
-        consoleBuffer.push(data as ConsoleMessage);
-      }
-      if (event === 'page_navigated') {
-        elementRefMap.invalidate();
-      }
-      if (event === 'browser_connected') {
-        ensureMonitors();
-      }
-      if (event === 'browser_disconnected') {
-        monitoredClient = null;
-        resetCssState();
-        dialogQueue.clear();
-        downloadTracker.clear();
-      }
-      // Reattach after tab switch (new client, no connect event)
-      ensureMonitors();
-    });
-  }
-
-  function makeBrowserManager(): BrowserManager {
-    const browserConfig = loadConfig({
-      cdpPort: config.cdpPort,
-      cdpHost: config.cdpHost
-    });
-    const manager = new BrowserManager(browserConfig);
-    attachEventHandlers(manager);
-    return manager;
-  }
-
-  registerBrowserTools(server, context, makeBrowserManager);
-  registerErrorTools(server, consoleBuffer);
-  registerSnapshotTools(server, context);
-  registerInteractionTools(server, context);
-  registerNetworkTools(server, context);
-  registerRuntimeTools(server, consoleBuffer);
-  registerStylesTools(server, context);
-  registerFilesTools(server, context);
-  registerPerformanceTools(server, context);
-  registerConnectTools(server, context, makeBrowserManager);
+  registerAllTools(server, context, makeDriver);
 
   return {
     server,
     cleanup: async () => {
-      if (context.manager) {
-        await context.manager.destroy();
-        context.manager = null;
+      if (context.driver) {
+        await context.driver.destroy();
+        context.driver = null;
       }
     }
   };
