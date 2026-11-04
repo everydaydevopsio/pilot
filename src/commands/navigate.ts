@@ -54,58 +54,49 @@ export async function executeNavigate(
     }
   });
 
+  // The timer and the page-event listener live outside the promise so the
+  // finally block can release them however the navigation ends, including
+  // when Page.navigate throws and the promise is never awaited.
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  let stopPageEvent: (() => void) | undefined;
+  const readHref = () =>
+    client.Runtime.evaluate({ expression: 'window.location.href' }).then(
+      (r) => ({ url: (r.result.value as string) ?? params.url })
+    );
+
   const navigationPromise = new Promise<{ url: string }>((resolve, reject) => {
-    const timeout = setTimeout(() => {
+    timeout = setTimeout(() => {
       reject(new Error('timeout'));
     }, params.timeoutMs);
 
     const cleanup = () => clearTimeout(timeout);
+    const onPageEvent = () => {
+      cleanup();
+      readHref().then(resolve, reject);
+    };
 
     if (params.waitUntil === 'load') {
-      client.Page.loadEventFired(() => {
-        cleanup();
-        client.Runtime.evaluate({ expression: 'window.location.href' }).then(
-          (r) => {
-            resolve({
-              url: (r.result.value as string) ?? params.url
-            });
-          },
-          reject
-        );
-      });
+      stopPageEvent = client.Page.loadEventFired(onPageEvent);
     } else if (params.waitUntil === 'domcontentloaded') {
-      client.Page.domContentEventFired(() => {
-        cleanup();
-        client.Runtime.evaluate({ expression: 'window.location.href' }).then(
-          (r) => {
-            resolve({
-              url: (r.result.value as string) ?? params.url
-            });
-          },
-          reject
-        );
-      });
+      stopPageEvent = client.Page.domContentEventFired(onPageEvent);
     } else {
       // networkidle
       manager
         .waitForNetworkIdle(params.timeoutMs)
         .then(() => {
           cleanup();
-          return client.Runtime.evaluate({
-            expression: 'window.location.href'
-          });
+          return readHref();
         })
-        .then((r) => {
-          resolve({
-            url: (r.result.value as string) ?? params.url
-          });
-        })
+        .then(resolve)
         .catch((err: unknown) => {
           cleanup();
           reject(err);
         });
     }
   });
+  // If Page.navigate throws, nothing awaits this promise; keep a late
+  // rejection from surfacing as an unhandled rejection.
+  navigationPromise.catch(() => undefined);
 
   try {
     const { frameId, loaderId } = await client.Page.navigate({
@@ -132,6 +123,8 @@ export async function executeNavigate(
 
     return result;
   } finally {
+    clearTimeout(timeout);
+    stopPageEvent?.();
     stopResponses();
     stopCommits();
   }

@@ -24,8 +24,14 @@ function fakeClient(opts: { href?: string; status?: number } = {}) {
   const client = {
     Page: {
       navigate,
-      loadEventFired: (cb: Cb) => (listeners.loadEventFired = cb),
-      domContentEventFired: (cb: Cb) => (listeners.domContentEventFired = cb),
+      loadEventFired: (cb: Cb) => {
+        listeners.loadEventFired = cb;
+        return () => undefined;
+      },
+      domContentEventFired: (cb: Cb) => {
+        listeners.domContentEventFired = cb;
+        return () => undefined;
+      },
       frameNavigated: () => () => undefined
     },
     Network: {
@@ -122,6 +128,74 @@ describe('executeNavigate', () => {
     ).rejects.toThrow('busy');
   });
 
+  describe('cleanup', () => {
+    // A client whose every event subscription returns a tracked unsubscribe.
+    function trackedClient(navigate: jest.Mock) {
+      const unsubscribed: string[] = [];
+      const on = (name: string) => () => () => unsubscribed.push(name);
+      const client = {
+        Page: {
+          navigate,
+          loadEventFired: on('loadEventFired'),
+          domContentEventFired: on('domContentEventFired'),
+          frameNavigated: on('frameNavigated')
+        },
+        Network: { responseReceived: on('responseReceived') },
+        Runtime: { evaluate: jest.fn() }
+      };
+      return { client: client as unknown as Client, unsubscribed };
+    }
+
+    it.each(['load', 'domcontentloaded'] as const)(
+      'removes its %s listener when the navigation times out',
+      async (waitUntil) => {
+        const { client, unsubscribed } = trackedClient(
+          jest.fn().mockResolvedValue({ frameId: 'f1', loaderId: 'l1' })
+        );
+        await expect(
+          executeNavigate(client, manager, {
+            url: 'https://a.test/',
+            waitUntil,
+            timeoutMs: 10
+          })
+        ).rejects.toThrow('timeout');
+        const event =
+          waitUntil === 'load' ? 'loadEventFired' : 'domContentEventFired';
+        expect(unsubscribed).toContain(event);
+      }
+    );
+
+    it('does not leave a pending timeout when Page.navigate throws', async () => {
+      const unhandled: unknown[] = [];
+      const onUnhandled = (reason: unknown) => unhandled.push(reason);
+      process.on('unhandledRejection', onUnhandled);
+      try {
+        const { client, unsubscribed } = trackedClient(
+          jest.fn().mockRejectedValue(new Error('target closed'))
+        );
+        await expect(
+          executeNavigate(client, manager, {
+            url: 'https://a.test/',
+            waitUntil: 'load',
+            timeoutMs: 10
+          })
+        ).rejects.toThrow('target closed');
+        // Wait past the timeout; a leaked timer would reject unobserved.
+        await new Promise((r) => setTimeout(r, 40));
+        expect(unhandled).toEqual([]);
+        expect(unsubscribed).toEqual(
+          expect.arrayContaining([
+            'loadEventFired',
+            'responseReceived',
+            'frameNavigated'
+          ])
+        );
+      } finally {
+        process.off('unhandledRejection', onUnhandled);
+      }
+    });
+  });
+
   describe('status', () => {
     type ResponseEvent = {
       // Main-frame document commit (Page.frameNavigated) instead of a response.
@@ -160,8 +234,11 @@ describe('executeNavigate', () => {
             });
             return { frameId: 'f1', loaderId };
           }),
-          loadEventFired: (cb: Cb) => (onLoad = cb),
-          domContentEventFired: () => undefined,
+          loadEventFired: (cb: Cb) => {
+            onLoad = cb;
+            return () => undefined;
+          },
+          domContentEventFired: () => () => undefined,
           frameNavigated: (cb: Cb) => {
             onCommit = cb;
             return () => undefined;
