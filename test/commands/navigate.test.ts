@@ -8,6 +8,10 @@ function fakeClient(opts: { href?: string; status?: number } = {}) {
   const listeners: Record<string, Cb> = {};
   const navigate = jest.fn(async () => {
     listeners.responseReceived?.({
+      requestId: 'l1',
+      loaderId: 'l1',
+      frameId: 'f1',
+      type: 'Document',
       response: { url: 'https://a.test/', status: opts.status ?? 200 }
     });
     // Fire both page events; the waitUntil mode decides which one counts.
@@ -15,7 +19,7 @@ function fakeClient(opts: { href?: string; status?: number } = {}) {
       listeners.domContentEventFired?.();
       listeners.loadEventFired?.();
     });
-    return { frameId: 'f1' };
+    return { frameId: 'f1', loaderId: 'l1' };
   });
   const client = {
     Page: {
@@ -24,7 +28,10 @@ function fakeClient(opts: { href?: string; status?: number } = {}) {
       domContentEventFired: (cb: Cb) => (listeners.domContentEventFired = cb)
     },
     Network: {
-      responseReceived: (cb: Cb) => (listeners.responseReceived = cb)
+      responseReceived: (cb: Cb) => {
+        listeners.responseReceived = cb;
+        return () => undefined;
+      }
     },
     Runtime: {
       evaluate: jest.fn().mockResolvedValue({
@@ -112,5 +119,123 @@ describe('executeNavigate', () => {
         timeoutMs: 1000
       })
     ).rejects.toThrow('busy');
+  });
+
+  describe('status', () => {
+    type ResponseEvent = {
+      loaderId: string;
+      frameId?: string;
+      type: string;
+      response: { url: string; status: number };
+    };
+
+    // Emits the given responses after Page.navigate returns, then fires load,
+    // like a page whose subresources finish after the document.
+    function clientWithResponses(responses: ResponseEvent[], loaderId = 'l1') {
+      let onResponse: ((e: ResponseEvent) => void) | undefined;
+      let onLoad: Cb | undefined;
+      const unsubscribe = jest.fn();
+      const client = {
+        Page: {
+          navigate: jest.fn(async () => {
+            setImmediate(() => {
+              for (const r of responses) onResponse?.(r);
+              onLoad?.();
+            });
+            return { frameId: 'f1', loaderId };
+          }),
+          loadEventFired: (cb: Cb) => (onLoad = cb),
+          domContentEventFired: () => undefined
+        },
+        Network: {
+          responseReceived: (cb: (e: ResponseEvent) => void) => {
+            onResponse = cb;
+            return unsubscribe;
+          }
+        },
+        Runtime: {
+          evaluate: jest.fn().mockResolvedValue({
+            result: { value: 'https://a.test/missing/' }
+          })
+        }
+      };
+      return { client: client as unknown as Client, unsubscribe };
+    }
+
+    const navigateTo = (client: Client) =>
+      executeNavigate(client, manager, {
+        url: 'https://a.test/missing/',
+        waitUntil: 'load',
+        timeoutMs: 1000
+      });
+
+    it('reports the main document status, not the last subresource status', async () => {
+      const { client } = clientWithResponses([
+        {
+          loaderId: 'l1',
+          frameId: 'f1',
+          type: 'Document',
+          response: { url: 'https://a.test/missing/', status: 404 }
+        },
+        {
+          loaderId: 'l1',
+          frameId: 'f1',
+          type: 'Script',
+          response: { url: 'https://a.test/app.js', status: 304 }
+        },
+        {
+          loaderId: 'l1',
+          frameId: 'f1',
+          type: 'Image',
+          response: { url: 'https://a.test/logo.png', status: 200 }
+        }
+      ]);
+      await expect(navigateTo(client)).resolves.toHaveProperty('status', 404);
+    });
+
+    it('ignores documents from iframes and earlier navigations', async () => {
+      const { client } = clientWithResponses(
+        [
+          {
+            loaderId: 'l0',
+            frameId: 'f1',
+            type: 'Document',
+            response: { url: 'https://a.test/previous/', status: 500 }
+          },
+          {
+            loaderId: 'l2',
+            frameId: 'f1',
+            type: 'Document',
+            response: { url: 'https://a.test/missing/', status: 201 }
+          },
+          {
+            loaderId: 'l9',
+            frameId: 'child',
+            type: 'Document',
+            response: { url: 'https://ads.test/', status: 403 }
+          }
+        ],
+        'l2'
+      );
+      await expect(navigateTo(client)).resolves.toHaveProperty('status', 201);
+    });
+
+    it('falls back to 200 when no document response is observed', async () => {
+      const { client } = clientWithResponses([
+        {
+          loaderId: 'l1',
+          frameId: 'f1',
+          type: 'Image',
+          response: { url: 'https://a.test/logo.png', status: 304 }
+        }
+      ]);
+      await expect(navigateTo(client)).resolves.toHaveProperty('status', 200);
+    });
+
+    it('removes its response listener after navigating', async () => {
+      const { client, unsubscribe } = clientWithResponses([]);
+      await navigateTo(client);
+      expect(unsubscribe).toHaveBeenCalledTimes(1);
+    });
   });
 });

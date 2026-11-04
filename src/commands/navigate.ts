@@ -31,81 +31,85 @@ export async function executeNavigate(
     );
   }
 
-  let finalStatus = 200;
+  // Collect document responses so the status reported is the navigated page's,
+  // not whichever image or script happened to finish last.
+  const documentResponses: Array<{
+    loaderId: string;
+    frameId?: string;
+    status: number;
+  }> = [];
+  const stopListening = client.Network.responseReceived((event) => {
+    if (event.type === 'Document' && event.response.status) {
+      documentResponses.push({
+        loaderId: event.loaderId,
+        frameId: event.frameId,
+        status: event.response.status
+      });
+    }
+  });
 
-  const navigationPromise = new Promise<{ url: string; status: number }>(
-    (resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('timeout'));
-      }, params.timeoutMs);
+  const navigationPromise = new Promise<{ url: string }>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('timeout'));
+    }, params.timeoutMs);
 
-      const cleanup = () => clearTimeout(timeout);
+    const cleanup = () => clearTimeout(timeout);
 
-      if (params.waitUntil === 'load') {
-        client.Page.loadEventFired(() => {
-          cleanup();
-          client.Runtime.evaluate({ expression: 'window.location.href' }).then(
-            (r) => {
-              resolve({
-                url: (r.result.value as string) ?? params.url,
-                status: finalStatus
-              });
-            },
-            reject
-          );
-        });
-      } else if (params.waitUntil === 'domcontentloaded') {
-        client.Page.domContentEventFired(() => {
-          cleanup();
-          client.Runtime.evaluate({ expression: 'window.location.href' }).then(
-            (r) => {
-              resolve({
-                url: (r.result.value as string) ?? params.url,
-                status: finalStatus
-              });
-            },
-            reject
-          );
-        });
-      } else {
-        // networkidle
-        manager
-          .waitForNetworkIdle(params.timeoutMs)
-          .then(() => {
-            cleanup();
-            return client.Runtime.evaluate({
-              expression: 'window.location.href'
-            });
-          })
-          .then((r) => {
+    if (params.waitUntil === 'load') {
+      client.Page.loadEventFired(() => {
+        cleanup();
+        client.Runtime.evaluate({ expression: 'window.location.href' }).then(
+          (r) => {
             resolve({
-              url: (r.result.value as string) ?? params.url,
-              status: finalStatus
+              url: (r.result.value as string) ?? params.url
             });
-          })
-          .catch((err: unknown) => {
-            cleanup();
-            reject(err);
+          },
+          reject
+        );
+      });
+    } else if (params.waitUntil === 'domcontentloaded') {
+      client.Page.domContentEventFired(() => {
+        cleanup();
+        client.Runtime.evaluate({ expression: 'window.location.href' }).then(
+          (r) => {
+            resolve({
+              url: (r.result.value as string) ?? params.url
+            });
+          },
+          reject
+        );
+      });
+    } else {
+      // networkidle
+      manager
+        .waitForNetworkIdle(params.timeoutMs)
+        .then(() => {
+          cleanup();
+          return client.Runtime.evaluate({
+            expression: 'window.location.href'
           });
-      }
+        })
+        .then((r) => {
+          resolve({
+            url: (r.result.value as string) ?? params.url
+          });
+        })
+        .catch((err: unknown) => {
+          cleanup();
+          reject(err);
+        });
     }
-  );
-
-  // Capture the response status
-  const responseHandler = (params: {
-    response: { url: string; status: number };
-  }) => {
-    if (params.response.url === params.response.url && params.response.status) {
-      finalStatus = params.response.status;
-    }
-  };
-  client.Network.responseReceived(responseHandler);
-
-  const { frameId } = await client.Page.navigate({ url: params.url });
-  void frameId; // used implicitly
+  });
 
   try {
-    const result = await navigationPromise;
+    const { frameId, loaderId } = await client.Page.navigate({
+      url: params.url
+    });
+    const { url } = await navigationPromise;
+    const document =
+      documentResponses.find((r) => loaderId && r.loaderId === loaderId) ??
+      documentResponses.filter((r) => r.frameId === frameId).at(-1);
+    const result = { url, status: document?.status ?? 200 };
 
     // Check final URL after redirects — block if redirected to a blocked origin
     const finalCheck = checkOrigin(result.url);
@@ -119,7 +123,6 @@ export async function executeNavigate(
 
     return result;
   } finally {
-    // Event listeners are auto-removed when client disconnects;
-    // for long-lived clients this is acceptable for v0.1
+    stopListening();
   }
 }
