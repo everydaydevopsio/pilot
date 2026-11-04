@@ -11,6 +11,8 @@ describe('loadConfig', () => {
     delete process.env.PILOT_HEADLESS;
     delete process.env.PILOT_VIEWPORT;
     delete process.env.PILOT_RESPONSIVE;
+    delete process.env.PILOT_BROWSER;
+    delete process.env.PILOT_FIREFOX_PATH;
   });
 
   it('returns defaults when no args or env vars', () => {
@@ -135,5 +137,26 @@ describe('loadConfig', () => {
     process.env.PILOT_RESPONSIVE = 'true';
     const config = loadConfig({ responsive: false });
     expect(config.responsive).toBe(false);
+  });
+
+  // #58: PILOT_BROWSER picks the default driver; PILOT_FIREFOX_PATH the binary.
+  it('browser defaults to chrome', () => {
+    expect(loadConfig().browser).toBe('chrome');
+  });
+
+  it('reads PILOT_BROWSER case-insensitively', () => {
+    process.env.PILOT_BROWSER = 'Firefox';
+    expect(loadConfig().browser).toBe('firefox');
+    expect(loadConfig({ browser: 'chrome' }).browser).toBe('chrome');
+  });
+
+  it('rejects an unknown PILOT_BROWSER', () => {
+    process.env.PILOT_BROWSER = 'netscape';
+    expect(() => loadConfig()).toThrow();
+  });
+
+  it('reads PILOT_FIREFOX_PATH', () => {
+    process.env.PILOT_FIREFOX_PATH = '/opt/firefox';
+    expect(loadConfig().firefoxPath).toBe('/opt/firefox');
   });
 });

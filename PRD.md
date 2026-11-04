@@ -101,15 +101,17 @@ protocol-neutral parameter and result types. Each driver owns its protocol and
 fills the shared session buffers (console, network, dialogs, downloads, element
 refs) from browser events.
 
-- `CdpDriver` is the only driver today. It wraps `BrowserManager` and the CDP
-  command implementations under `src/commands/`, and supports every capability.
-- `createDriver(kind)` builds `CdpDriver` for `chrome`. `firefox`, `safari`, and
-  `webkit` fail with an error that links their tracking issues
-  ([#58](https://github.com/everydaydevopsio/pilot/issues/58),
-  [#59](https://github.com/everydaydevopsio/pilot/issues/59),
-  [#60](https://github.com/everydaydevopsio/pilot/issues/60),
+- `CdpDriver` wraps `BrowserManager` and the CDP command implementations under
+  `src/commands/`, and supports every capability.
+- `BidiDriver` drives Firefox over WebDriver BiDi (see
+  [Firefox driver](#firefox-driver)). It supports every capability except
+  `performanceTrace`.
+- `createDriver(kind)` builds `CdpDriver` for `chrome` and `BidiDriver` for
+  `firefox`. `safari` and `webkit` fail with an error that links their tracking
+  issues ([#60](https://github.com/everydaydevopsio/pilot/issues/60),
   [#61](https://github.com/everydaydevopsio/pilot/issues/61)).
-  There is no user-facing browser selection yet.
+- `browser_start` and `browser_connect` take `browser: 'chrome' | 'firefox'`;
+  `PILOT_BROWSER` sets the default (`chrome`).
 - Every driver declares a capability set (`tabs`, `navigation`, `evaluate`,
   `input`, `screenshot`, `viewport`, `accessibilitySnapshot`, `styles`,
   `console`, `network`, `dialogs`, `uploads`, `downloads`, `performanceTrace`,
@@ -129,6 +131,51 @@ Acceptance criteria:
 - AC4: `createDriver` builds `CdpDriver` for `chrome` and reports the tracking issue for other browsers.
 - AC5: `browser_status` includes `session.browser`.
 - AC6: Unit tests cover the driver, the capability gate, the factory, and every tool's delegation; E2E covers every browser-dependent tool.
+
+### Firefox driver
+
+Tracking issue: [#58](https://github.com/everydaydevopsio/pilot/issues/58).
+Firefox removed CDP, so `BidiDriver` speaks WebDriver BiDi to the WebSocket
+Firefox serves at `ws://127.0.0.1:<port>/session` when started with
+`--remote-debugging-port`.
+
+- Launch: `-no-remote`, `-profile $XDG_DATA_HOME/pilot/firefox/<profileName>`,
+  `--window-size`, and `--headless` when headless (with `MOZ_HEADLESS_WIDTH` and
+  `MOZ_HEADLESS_HEIGHT` so headless windows are not clamped to 1366x768). The
+  executable comes from `firefoxPath`, `PILOT_FIREFOX_PATH`, or the macOS
+  application folders. A `user.js` disables first-run pages.
+- Profile lock: Firefox's `.parentlock` survives a clean exit, so Pilot writes
+  `pilot.lock` (`{ pid, host }`) after launch and removes it on exit. A lock
+  naming a dead pid on this host is stale and is cleared on launch.
+- Session: `session.new` with `unhandledPromptBehavior: ignore`, a global
+  `session.subscribe`, a response-body data collector, and
+  `browser.setDownloadBehavior` to `PILOT_DOWNLOAD_DIR`. After attaching, the
+  window is resized with `browser.setClientWindowState`, because a reused
+  profile restores its saved window size over `--window-size`.
+- Mapping: tabs are top-level browsing contexts; script runs through
+  `script.evaluate` and `script.callFunction`; input through
+  `input.performActions`; console from `log.entryAdded`; network from
+  `network.beforeRequestSent`, `responseCompleted`, and `fetchError`, with
+  bodies from `network.getData`; screenshots from
+  `browsingContext.captureScreenshot`; viewports from
+  `browsingContext.setViewport` and `emulation.setUserAgentOverride`; dialogs
+  from `userPromptOpened` and `handleUserPrompt`; uploads from `input.setFiles`;
+  downloads from `downloadWillBegin` and `downloadEnd`.
+- Snapshot: BiDi has no accessibility tree. `src/browser/inspect/dom-snapshot.ts`
+  walks the DOM in the page (open shadow roots included), computes implicit
+  ARIA roles and simplified accessible names, and applies the same inclusion
+  rules as the CDP snapshot. Refs hold BiDi shared ids; a "no such node" error
+  becomes the stale-ref error. The script is reusable by a WebKit driver.
+- Styles: computed styles and a box model come from the page; matched CSS rules
+  are not available and the output says so.
+- `browser_performance` is not supported and fails at the capability gate.
+
+Acceptance criteria:
+
+- AC1: `browser_start({ browser: 'firefox' })` launches Firefox on macOS and every supported tool works end to end.
+- AC2: Unsupported tools return a clear capability error naming the browser.
+- AC3: The E2E suite runs against Firefox on macOS with `PILOT_BROWSER=firefox`.
+- AC4: README lists the Firefox capability matrix and setup.
 
 ### Chrome lifecycle
 
@@ -506,7 +553,9 @@ All configuration via environment variables. CLI flags are limited to `--version
 | `PILOT_CDP_RETRY_MS`      | integer (≥100)  | `2000`        | Initial CDP reconnect interval (ms)                     |
 | `PILOT_CDP_MAX_RETRY_MS`  | integer (≥1000) | `30000`       | Max CDP reconnect interval (ms)                         |
 | `PILOT_LOG_LEVEL`         | enum            | `info`        | Pino log level (trace/debug/info/warn/error/fatal)      |
+| `PILOT_BROWSER`           | enum            | `chrome`      | Default browser: `chrome` or `firefox`                  |
 | `PILOT_CHROME_PATH`       | string          | auto-detected | Path to Chrome executable                               |
+| `PILOT_FIREFOX_PATH`      | string          | auto-detected | Path to Firefox executable                              |
 | `PILOT_HEADLESS`          | boolean         | `false`       | Run Chrome in headless mode (`true`/`1` or `false`/`0`) |
 | `PILOT_CHROME_NO_SANDBOX` | boolean         | `false`       | Disable Chrome sandbox (auto-enabled as root)           |
 | `PILOT_PROFILE_NAME`      | string          | `profile1`    | Chrome profile directory name                           |
@@ -622,6 +671,9 @@ pilot/
 17. All tests pass; TypeScript builds clean in strict mode; coverage meets 75% threshold.
 18. Every MCP tool runs through a `BrowserDriver` and is gated on the driver's
     capabilities (see [Browser drivers](#browser-drivers)).
+19. `browser_start({ browser: 'firefox' })` drives Firefox on macOS over
+    WebDriver BiDi, and the E2E suite passes with `PILOT_BROWSER=firefox`
+    (see [Firefox driver](#firefox-driver)).
 
 ---
 
@@ -635,5 +687,5 @@ pilot/
 - DOM query/selection tool to reduce reliance on `browser_evaluate` for common tasks?
 - Cookie and localStorage management tools?
 - File upload/download handling via CDP?
-- Firefox (WebDriver BiDi), Safari (safaridriver), and WebKit (Playwright) drivers:
-  #58, #59, #60, #61.
+- Firefox on Linux and Windows (#59), Safari (safaridriver, #60), and WebKit
+  (Playwright, #61) drivers.

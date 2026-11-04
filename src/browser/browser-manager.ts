@@ -26,6 +26,7 @@ import {
   DEFAULT_STARTUP_TIMEOUT_MS
 } from './chrome-launcher.js';
 import { assertLinuxBrowserPrerequisites } from './preflight.js';
+import { stopBrowserProcess } from './process.js';
 import {
   connectToChrome,
   enableDomains,
@@ -323,7 +324,7 @@ export class BrowserManager {
     }
     this.launchedUserDataDir = null;
     const pid = proc.pid;
-    const stopped = await stopChromeProcess(proc);
+    const stopped = await stopBrowserProcess(proc);
     if (stopped && pid !== undefined) {
       cleanupLockFiles(userDataDir, pid);
     }
@@ -536,7 +537,7 @@ export class BrowserManager {
       const proc = this.chromeProcess;
       this.chromeProcess = null;
       this.launchedCdpPort = null;
-      if (await stopChromeProcess(proc)) {
+      if (await stopBrowserProcess(proc)) {
         this.cleanupUserDataDir(proc.pid);
       } else {
         getLogger().warn(
@@ -560,42 +561,6 @@ function filterChromeStderr(stderr: string): string {
 interface LaunchCleanup {
   pid: number | undefined;
   stopped: boolean;
-}
-
-/** Terminate a Chrome process, escalating to SIGKILL. Resolves true once it has exited. */
-async function stopChromeProcess(proc: ChildProcess): Promise<boolean> {
-  const hasExited = () => proc.exitCode !== null || proc.signalCode !== null;
-  if (proc.pid === undefined || hasExited()) return true;
-
-  const waitForExit = (ms: number) =>
-    new Promise<boolean>((resolve) => {
-      if (hasExited()) {
-        resolve(true);
-        return;
-      }
-      const timer = setTimeout(() => {
-        proc.off('exit', onExit);
-        resolve(hasExited());
-      }, ms);
-      const onExit = () => {
-        clearTimeout(timer);
-        resolve(true);
-      };
-      proc.once('exit', onExit);
-    });
-
-  try {
-    proc.kill();
-  } catch {
-    // process may have already exited
-  }
-  if (await waitForExit(5000)) return true;
-  try {
-    proc.kill('SIGKILL');
-  } catch {
-    // process may have already exited
-  }
-  return waitForExit(2000);
 }
 
 function describeProfileConflict(

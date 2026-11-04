@@ -1,11 +1,11 @@
 ---
 name: pilot
-description: Control and debug web pages with the Pilot MCP browser tools. Use when the user asks to open, inspect, test, or troubleshoot a site in Chrome with Pilot.
+description: Control and debug web pages with the Pilot MCP browser tools. Use when the user asks to open, inspect, test, or troubleshoot a site in Chrome or Firefox with Pilot.
 ---
 
 # Pilot browser workflow
 
-Use the `pilot` MCP tools to operate Chrome through the Chrome DevTools Protocol.
+Use the `pilot` MCP tools to operate Chrome (over the Chrome DevTools Protocol) or Firefox (over WebDriver BiDi). Chrome is the default; pass `browser: "firefox"` to `browser_start` or `browser_connect`, or set `PILOT_BROWSER=firefox`, when the user wants Firefox.
 
 ## Start and inspect
 
@@ -14,6 +14,8 @@ Use the `pilot` MCP tools to operate Chrome through the Chrome DevTools Protocol
 3. Use refs returned by `browser_snapshot` or `browser_find` for interaction. Take a fresh snapshot after navigation or substantial DOM changes because refs can become stale.
 4. For debugging, clear errors before reproducing the problem, then inspect `browser_errors`, `browser_console`, and `browser_network`. Use performance tracing only when the user asks about load or runtime performance.
 5. Call `browser_stop` when the browser is no longer needed.
+
+Firefox does not support `browser_performance`, and its `browser_styles` output has computed styles but no matched CSS rules. A tool the active browser cannot run fails with `<tool> is not supported by <browser>`; switch to Chrome for it if the user agrees.
 
 Do not enter credentials, submit consequential forms, upload files, or make other externally visible changes unless the user authorized that action.
 
@@ -47,7 +49,7 @@ Read the `Launch:`, `Cleanup:`, and `Next:` lines in the `browser_start` error b
 
 - If the profile directory is not writable, set `XDG_DATA_HOME` to a writable directory.
 - If loopback binding fails with `EPERM`, the host or container must allow binding on `127.0.0.1`; disabling Chrome's renderer sandbox does not fix it.
-- If Chrome is not detected, set `PILOT_CHROME_PATH` to its executable.
+- If Chrome is not detected, set `PILOT_CHROME_PATH` to its executable. For Firefox, set `PILOT_FIREFOX_PATH` or pass `firefoxPath`.
 - Avoid `PILOT_CHROME_NO_SANDBOX=true` unless the runtime genuinely cannot support Chrome's sandbox and the user accepts the security tradeoff.
 
 ### Connection and page failures

@@ -55,6 +55,12 @@ async function run(): Promise<void> {
       '  PILOT_LOG_LEVEL         Log level: trace|debug|info|warn|error|fatal (default: info)'
     );
     console.log(
+      '  PILOT_BROWSER           Default browser: chrome|firefox (default: chrome)'
+    );
+    console.log(
+      '  PILOT_FIREFOX_PATH      Firefox executable (auto-detected on macOS)'
+    );
+    console.log(
       '  PILOT_PROFILE_NAME      Browser profile name (default: profile1)'
     );
     console.log(
