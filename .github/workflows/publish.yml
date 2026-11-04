@@ -11,9 +11,6 @@ on:
           - patch
           - minor
           - major
-  push:
-    tags:
-      - 'v*'
 
 concurrency:
   group: publish-${{ github.ref }}
@@ -21,7 +18,6 @@ concurrency:
 
 jobs:
   bump_and_tag:
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -40,7 +36,7 @@ jobs:
         id: prev
         uses: WyriHaximus/github-action-get-previous-tag@v2
         with:
-          fallback: v0.0.0
+          fallback: 0.0.0
 
       - name: Calculate next versions
         id: semver
@@ -56,11 +52,12 @@ jobs:
             minor) VERSION="${{ steps.semver.outputs.minor }}" ;;
             major) VERSION="${{ steps.semver.outputs.major }}" ;;
           esac
-          # Remove v prefix for package.json
-          VERSION_NUM="${VERSION#v}"
-          echo "version=${VERSION_NUM}" >> "$GITHUB_OUTPUT"
+          # Release tags are the bare version (0.7.1), with no v prefix.
+          # Strip one defensively in case the action's output ever carries it.
+          VERSION="${VERSION#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Selected version: ${VERSION_NUM} (tag: ${VERSION})"
+          echo "Selected version and tag: ${VERSION}"
 
       - name: Enable corepack
         run: corepack enable
@@ -132,7 +129,6 @@ jobs:
 
   publish:
     needs: [bump_and_tag]
-    if: always() && (needs.bump_and_tag.result == 'success' || github.event_name == 'push')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -141,15 +137,8 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          if [ "${{ github.event_name }}" == "push" ]; then
-            TAG="${{ github.ref_name }}"
-            VERSION="${TAG#v}"
-          else
-            TAG="${{ needs.bump_and_tag.outputs.tag }}"
-            VERSION="${{ needs.bump_and_tag.outputs.version }}"
-          fi
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${{ needs.bump_and_tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          echo "version=${{ needs.bump_and_tag.outputs.version }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout tag
         uses: actions/checkout@v7
@@ -193,9 +182,8 @@ jobs:
       - name: Publish to npmjs
         run: npm publish --access public --provenance
 
-      # castoff notes come from the bump_and_tag job, which only runs on
-      # workflow_dispatch. A tag pushed by hand skips that job, so fall back to
-      # GitHub's own generated notes rather than publishing an empty body.
+      # castoff notes come from the bump_and_tag job. If they are empty, fall
+      # back to GitHub's own generated notes rather than publishing an empty body.
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

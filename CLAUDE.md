@@ -22,6 +22,8 @@ This repository publishes to **npmjs** under the `@everydaydevopsio` scope.
 - Authentication uses npm trusted publishing (GitHub OIDC) — no token secret needed
 - Publish job requires `id-token: write` permission for OIDC and provenance
 - Publish with `npm publish --access public --provenance`
+- Release only via `gh workflow run publish.yml -f release_type=patch|minor|major`; pushing a tag does not trigger a release
+- Release tags have no `v` prefix (e.g. `0.7.1`, matching `package.json`). This overrides the `v`-prefixed tag guidance in the Ballast-generated `.claude/rules/publishing-*.md` files
 
 ## Installed agent rules
 
