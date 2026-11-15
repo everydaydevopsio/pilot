@@ -1,8 +1,10 @@
 import type { StaleElementError } from './types.js';
 
-interface RefEntry {
-  backendNodeId: number;
-}
+/**
+ * A ref points at a CDP backend node id (Chrome) or a WebDriver BiDi shared
+ * node id (Firefox); each driver only stores and resolves its own kind.
+ */
+type RefEntry = { backendNodeId: number } | { sharedId: string };
 
 export class ElementRefMap {
   private generation = 0;
@@ -41,12 +43,29 @@ export class ElementRefMap {
     this.refs.set(ref, { backendNodeId });
   }
 
+  setShared(ref: string, sharedId: string): void {
+    this.refs.set(ref, { sharedId });
+  }
+
   resolve(ref: string): number {
     const entry = this.refs.get(ref);
-    if (!entry) {
+    if (!entry || !('backendNodeId' in entry)) {
       throw this.staleError(ref);
     }
     return entry.backendNodeId;
+  }
+
+  resolveShared(ref: string): string {
+    const entry = this.refs.get(ref);
+    if (!entry || !('sharedId' in entry)) {
+      throw this.staleError(ref);
+    }
+    return entry.sharedId;
+  }
+
+  /** The stale-ref error, for drivers that detect staleness in the page. */
+  stale(ref: string): Error {
+    return this.staleError(ref);
   }
 
   has(ref: string): boolean {

@@ -1,3 +1,4 @@
+import { BidiDriver } from '../../../src/browser/driver/bidi-driver.js';
 import { CdpDriver } from '../../../src/browser/driver/cdp-driver.js';
 import {
   PLANNED_DRIVERS,
@@ -24,7 +25,8 @@ function session(): DriverSession {
   };
 }
 
-// #62 AC4: chrome builds a CdpDriver; other browsers report their tracking issue.
+// #62 AC4 / #58: chrome builds a CdpDriver and firefox a BidiDriver; other
+// browsers report their tracking issue.
 describe('createDriver', () => {
   it('builds a disconnected CdpDriver for chrome', async () => {
     const driver = createDriver('chrome', loadConfig(), session());
@@ -39,14 +41,28 @@ describe('createDriver', () => {
     await driver.destroy();
   });
 
-  it.each(['firefox', 'safari', 'webkit'] as const)(
+  it('builds a disconnected BidiDriver for firefox', async () => {
+    const driver = createDriver('firefox', loadConfig(), session());
+    expect(driver).toBeInstanceOf(BidiDriver);
+    expect(driver.kind).toBe('firefox');
+    expect(driver.isConnected()).toBe(false);
+    expect(driver.capabilities.has('performanceTrace')).toBe(false);
+    expect(driver.getSessionInfo()).toEqual({
+      browser: 'firefox',
+      mode: 'none',
+      connected: false
+    });
+    await driver.destroy();
+  });
+
+  it.each(['safari', 'webkit'] as const)(
     'rejects %s with its tracking issue',
     (kind) => {
       expect(() => createDriver(kind, loadConfig(), session())).toThrow(
         UnsupportedBrowserError
       );
       expect(() => createDriver(kind, loadConfig(), session())).toThrow(
-        `Pilot does not support ${kind} yet; only chrome is available. Progress is tracked in ${PLANNED_DRIVERS[kind]}.`
+        `Pilot does not support ${kind} yet; available browsers: chrome, firefox. Progress is tracked in ${PLANNED_DRIVERS[kind]}.`
       );
     }
   );

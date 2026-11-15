@@ -9,10 +9,12 @@ function cleanupTestProfile(): void {
   try {
     const xdgData =
       process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share');
-    rmSync(join(xdgData, 'aab', TEST_PROFILE), {
-      recursive: true,
-      force: true
-    });
+    for (const dir of [
+      join(xdgData, 'pilot', TEST_PROFILE),
+      join(xdgData, 'pilot', 'firefox', TEST_PROFILE)
+    ]) {
+      rmSync(dir, { recursive: true, force: true });
+    }
   } catch {
     // best-effort
   }

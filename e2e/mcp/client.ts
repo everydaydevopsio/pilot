@@ -13,6 +13,11 @@ export interface ToolResult {
   isError?: boolean;
 }
 
+/** Browser the suite runs against: PILOT_BROWSER=firefox switches every test. */
+export const E2E_BROWSER = (
+  process.env.PILOT_BROWSER ?? 'chrome'
+).toLowerCase();
+
 let clientCounter = 0;
 
 export class McpTestClient {
@@ -100,8 +105,12 @@ export class McpTestClient {
     try {
       const xdgData =
         process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share');
-      const profileDir = join(xdgData, 'pilot', this.profileName);
-      rmSync(profileDir, { recursive: true, force: true });
+      for (const dir of [
+        join(xdgData, 'pilot', this.profileName),
+        join(xdgData, 'pilot', 'firefox', this.profileName)
+      ]) {
+        rmSync(dir, { recursive: true, force: true });
+      }
     } catch {
       // best-effort cleanup
     }

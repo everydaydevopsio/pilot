@@ -15,21 +15,8 @@ export interface SelectResult {
   selectedLabel: string;
 }
 
-/**
- * Select an option in a <select> element by value, label, or index.
- */
-export async function executeSelect(
-  client: Client,
-  refMap: ElementRefMap,
-  params: SelectParams
-): Promise<SelectResult> {
-  const resolved = await resolveRef(client, refMap, params.ref);
-
-  await focusRef(client, resolved.backendNodeId);
-
-  const { result, exceptionDetails } = await client.Runtime.callFunctionOn({
-    objectId: resolved.objectId,
-    functionDeclaration: `function(byValue, byLabel, byIndex) {
+/** Selects an option by value, label, or index; shared by every driver. */
+export const SELECT_OPTION_FUNCTION = `function(byValue, byLabel, byIndex) {
       if (this.tagName.toLowerCase() !== 'select') {
         throw new Error('Element is not a <select>');
       }
@@ -51,7 +38,23 @@ export async function executeSelect(
       this.dispatchEvent(new Event('change', { bubbles: true }));
       var sel = this.options[this.selectedIndex];
       return { value: sel.value, label: sel.textContent.trim() };
-    }`,
+    }`;
+
+/**
+ * Select an option in a <select> element by value, label, or index.
+ */
+export async function executeSelect(
+  client: Client,
+  refMap: ElementRefMap,
+  params: SelectParams
+): Promise<SelectResult> {
+  const resolved = await resolveRef(client, refMap, params.ref);
+
+  await focusRef(client, resolved.backendNodeId);
+
+  const { result, exceptionDetails } = await client.Runtime.callFunctionOn({
+    objectId: resolved.objectId,
+    functionDeclaration: SELECT_OPTION_FUNCTION,
     arguments: [
       { value: params.value ?? null },
       { value: params.label ?? null },

@@ -20,6 +20,7 @@ export interface BrowserState {
 export interface LaunchOptions {
   headless?: boolean;
   chromePath?: string;
+  firefoxPath?: string;
   profileName?: string;
   viewport?: string;
   viewportWidth?: number;
@@ -32,7 +33,7 @@ export interface LaunchOptions {
 export interface SessionInfo {
   /** Browser the session drives; set by the driver. */
   browser?: BrowserKind;
-  /** launched: Chrome started by this session; external: browser_connect. */
+  /** launched: browser started by this session; external: browser_connect. */
   mode: 'launched' | 'external' | 'none';
   connected: boolean;
   profile?: string;
@@ -40,6 +41,8 @@ export interface SessionInfo {
   pid?: number;
   host?: string;
   cdpPort?: number;
+  /** WebDriver BiDi port (Firefox). */
+  bidiPort?: number;
 }
 
 export type SandboxDecision =

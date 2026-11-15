@@ -14,6 +14,7 @@ import { hostname, tmpdir } from 'os';
 import { join } from 'path';
 import {
   isPilotChrome,
+  isPilotFirefox,
   listProfiles,
   pilotDataDir,
   readProcessCommand,
@@ -21,6 +22,10 @@ import {
   stopPilotBrowsers
 } from '../src/browser/sessions.js';
 import { isProcessAlive } from '../src/browser/chrome-launcher.js';
+import {
+  FIREFOX_LOCK_FILE,
+  writeFirefoxLock
+} from '../src/browser/firefox-launcher.js';
 import { registerBrowserTools } from '../src/mcp/tools/browser.js';
 
 const unix = process.platform === 'win32' ? describe.skip : describe;
@@ -127,6 +132,115 @@ unix('Pilot sessions', () => {
     expect(isSymlink(staleLock)).toBe(true);
   });
 
+  // #58: Firefox profiles live under firefox/ and use Pilot's own lock file.
+  describe('Firefox profiles', () => {
+    function fakeFirefoxBinary(): string {
+      const path = join(workDir, 'firefox');
+      if (!isSymlink(path)) symlinkSync('/bin/bash', path);
+      return path;
+    }
+
+    function ffProfileDir(name: string): string {
+      const dir = join(pilotDataDir(), 'firefox', name);
+      mkdirSync(dir, { recursive: true });
+      return dir;
+    }
+
+    function ffHolder(dir: string): ChildProcess {
+      return holder(`-profile ${dir}`, 'sleep 30; :', fakeFirefoxBinary());
+    }
+
+    function ffLockExists(dir: string): boolean {
+      try {
+        lstatSync(join(dir, FIREFOX_LOCK_FILE));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    it('lists Firefox profiles after Chrome ones', async () => {
+      profileDir('chrome1');
+      ffProfileDir('free');
+      writeFirefoxLock(ffProfileDir('stale'), 999999);
+      writeFileSync(
+        join(ffProfileDir('remote'), FIREFOX_LOCK_FILE),
+        JSON.stringify({ pid: 7, host: 'other-host' })
+      );
+      writeFileSync(join(ffProfileDir('unknown'), FIREFOX_LOCK_FILE), 'x');
+      const liveDir = ffProfileDir('live');
+      const live = ffHolder(liveDir);
+      writeFirefoxLock(liveDir, live.pid!);
+      await waitAlive(live.pid!);
+
+      const profiles = listProfiles();
+      expect(profiles.map((p) => `${p.browser}:${p.profile}`)).toEqual([
+        'chrome:chrome1',
+        'firefox:free',
+        'firefox:live',
+        'firefox:remote',
+        'firefox:stale',
+        'firefox:unknown'
+      ]);
+      const byName = Object.fromEntries(profiles.map((p) => [p.profile, p]));
+      expect(byName.free.state).toBe('unlocked');
+      expect(byName.live).toMatchObject({
+        state: 'locked',
+        pid: live.pid,
+        pilotFirefox: true
+      });
+      expect(byName.remote).toMatchObject({
+        state: 'locked_other_host',
+        host: 'other-host'
+      });
+      expect(byName.stale).toMatchObject({ state: 'stale', pid: 999999 });
+      expect(byName.unknown.state).toBe('locked_unknown');
+    });
+
+    it('verifies Firefox by executable and exact -profile directory', async () => {
+      const dir = ffProfileDir('exact');
+      const right = ffHolder(dir);
+      const prefix = ffHolder(`${dir}2`);
+      const shell = holder(`-profile ${dir}`, 'sleep 30; :', '/bin/bash');
+      await waitAlive(right.pid!);
+      await waitAlive(prefix.pid!);
+      await waitAlive(shell.pid!);
+      expect(isPilotFirefox(right.pid!, dir)).toBe(true);
+      expect(isPilotFirefox(prefix.pid!, dir)).toBe(false);
+      expect(isPilotFirefox(shell.pid!, dir)).toBe(false);
+    });
+
+    it('stops verified Pilot Firefox and cleans stale locks', async () => {
+      const pilotDir = ffProfileDir('pilot');
+      const pilot = ffHolder(pilotDir);
+      writeFirefoxLock(pilotDir, pilot.pid!);
+      const impostorDir = ffProfileDir('impostor');
+      const impostor = holder('--other', 'sleep 30; :', fakeFirefoxBinary());
+      writeFirefoxLock(impostorDir, impostor.pid!);
+      const staleDir = ffProfileDir('stale');
+      writeFirefoxLock(staleDir, 999999);
+      await waitAlive(pilot.pid!);
+      await waitAlive(impostor.pid!);
+
+      const byName = Object.fromEntries(
+        (await stopPilotBrowsers()).map((r) => [r.profile, r])
+      );
+      expect(byName['firefox/pilot']).toMatchObject({
+        outcome: 'stopped',
+        detail: `stopped Firefox pid ${pilot.pid}`
+      });
+      expect(isProcessAlive(pilot.pid!)).toBe(false);
+      expect(ffLockExists(pilotDir)).toBe(false);
+      expect(byName['firefox/impostor']).toMatchObject({
+        outcome: 'skipped',
+        detail: expect.stringContaining('does not show Firefox using')
+      });
+      expect(isProcessAlive(impostor.pid!)).toBe(true);
+      expect(byName['firefox/stale'].outcome).toBe('cleaned');
+      expect(ffLockExists(staleDir)).toBe(false);
+    });
+  });
+
   it('matches only the exact profile directory on the command line', async () => {
     const dir = profileDir('exact');
     const right = holder(`--user-data-dir=${dir}`);
@@ -213,6 +327,7 @@ unix('Pilot sessions', () => {
     await waitAlive(replacement.pid!);
 
     const result = await stopLockedProfile({
+      browser: 'chrome',
       profile: 'reused',
       userDataDir: dir,
       state: 'locked',

@@ -46,9 +46,17 @@ import type { TypeParams, TypeResult } from '../../commands/type.js';
 import type { UploadParams, UploadResult } from '../../commands/upload.js';
 import type { WaitParams, WaitResult } from '../../commands/wait.js';
 
-/** Browsers Pilot knows about. Only `chrome` has a driver today. */
+/** Browsers Pilot knows about. See SUPPORTED_BROWSERS in factory.ts for which have drivers. */
 export const BROWSER_KINDS = ['chrome', 'firefox', 'safari', 'webkit'] as const;
 export type BrowserKind = (typeof BROWSER_KINDS)[number];
+
+/** Browser names for user-facing messages. */
+export const BROWSER_NAMES: Readonly<Record<BrowserKind, string>> = {
+  chrome: 'Chrome',
+  firefox: 'Firefox',
+  safari: 'Safari',
+  webkit: 'WebKit'
+};
 
 /**
  * Features a driver may or may not provide. Each MCP tool declares the

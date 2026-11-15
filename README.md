@@ -7,7 +7,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/everydaydevopsio/pilot)](https://github.com/everydaydevopsio/pilot/releases)
 [![npm version](https://img.shields.io/npm/v/@everydaydevopsio/pilot.svg)](https://www.npmjs.com/package/@everydaydevopsio/pilot)
 
-A lightweight Node.js/TypeScript MCP server that gives AI agents DevTools-grade control over a running Chrome instance. Connects to Chrome via the Chrome DevTools Protocol (CDP) and exposes 35 MCP tools for browser automation, inspection, and debugging — including structured accessibility snapshots, element ref-based interaction, network/console/CSS inspection, file operations, performance tracing, and security controls.
+A lightweight Node.js/TypeScript MCP server that gives AI agents DevTools-grade control over a running Chrome or Firefox. Drives Chrome over the Chrome DevTools Protocol (CDP) and Firefox over WebDriver BiDi (see [Browser Support](#browser-support)), and exposes 35 MCP tools for browser automation, inspection, and debugging — including structured accessibility snapshots, element ref-based interaction, network/console/CSS inspection, file operations, performance tracing, and security controls.
 
 Use pilot to open a URL, interact with it using semantic element refs, inspect network traffic, diagnose CSS issues, and watch for errors — all from any AI agent that speaks MCP.
 
@@ -162,14 +162,19 @@ across sessions:
   and each profile's lock state:
   - `unlocked`: the profile is free.
   - `locked`: a live process on this host holds the lock. The `pilotChrome`
-    field shows whether that process is Chrome using this profile.
+    (or, for Firefox, `pilotFirefox`) field shows whether that process is the
+    browser using this profile.
   - `stale`: the process that held the lock is gone.
   - `locked_other_host`: the lock was created on another host.
   - `locked_unknown`: Pilot cannot read the lock's owner.
-- `browser_stop_all` stops this session's browser, then every Chrome on this
-  host that holds a Pilot profile lock. Before each signal, it checks that the
-  process is a Chrome or Chromium executable and that its command line has the
-  exact argument `--user-data-dir=<that profile's directory>`. A reused pid or
+    Each entry has a `browser` field (`chrome` or `firefox`); Firefox profiles
+    are listed after Chrome ones.
+- `browser_stop_all` stops this session's browser, then every Chrome or Firefox
+  on this host that holds a Pilot profile lock. Before each signal, it checks
+  that the process is a Chrome or Chromium executable whose command line has the
+  exact argument `--user-data-dir=<that profile's directory>`, or a Firefox
+  executable with `-profile <that profile's directory>`. Firefox results are
+  labelled `firefox/<profile>`. A reused pid or
   an unrelated process is never stopped. A browser is reported as stopped only
   after it has exited, and a lock that cannot be removed is reported as failed.
   It also removes stale locks. Locks from other hosts and locks with no readable owner
@@ -316,13 +321,13 @@ Or add to `.mcp.json` in your project:
 
 **Browser Lifecycle:**
 
-| Tool               | Description                                         |
-| ------------------ | --------------------------------------------------- |
-| `browser_start`    | Launch Chrome                                       |
-| `browser_stop`     | Stop Chrome (or disconnect from external Chrome)    |
-| `browser_status`   | List this session's browser and Pilot profile locks |
-| `browser_stop_all` | Stop every Pilot-managed Chrome on this host        |
-| `browser_connect`  | Connect to an existing Chrome with remote debugging |
+| Tool               | Description                                           |
+| ------------------ | ----------------------------------------------------- |
+| `browser_start`    | Launch Chrome, or Firefox with `browser: "firefox"`   |
+| `browser_stop`     | Stop the browser (or disconnect from an external one) |
+| `browser_status`   | List this session's browser and Pilot profile locks   |
+| `browser_stop_all` | Stop every Pilot-managed browser on this host         |
+| `browser_connect`  | Connect to an existing Chrome or Firefox              |
 
 **Snapshot & Find:**
 
@@ -408,10 +413,12 @@ All configuration via environment variables.
 | `PILOT_CDP_PORT`          | `9222`                     | CDP port when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                                                                                                        |
 | `PILOT_CDP_HOST`          | `127.0.0.1`                | CDP host when connecting to an existing Chrome (ignored when `browser_start` launches Chrome)                                                                                                                                                                        |
 | `PILOT_LOG_LEVEL`         | `info`                     | Pino log level                                                                                                                                                                                                                                                       |
+| `PILOT_BROWSER`           | `chrome`                   | Browser `browser_start` and `browser_connect` use when the call does not pass `browser`: `chrome` or `firefox`.                                                                                                                                                      |
 | `PILOT_CHROME_PATH`       | (auto)                     | Path to Chrome executable                                                                                                                                                                                                                                            |
+| `PILOT_FIREFOX_PATH`      | (auto)                     | Path to the Firefox executable. Defaults to `/Applications/Firefox.app/Contents/MacOS/firefox` on macOS.                                                                                                                                                             |
 | `PILOT_HEADLESS`          | `false`                    | Run Chrome headless. Accepts `true`/`1` or `false`/`0`.                                                                                                                                                                                                              |
 | `PILOT_MCP_BUFFER_SIZE`   | `1000`                     | Console message buffer size                                                                                                                                                                                                                                          |
-| `PILOT_PROFILE_NAME`      | `profile1`                 | Persistent browser profile name. Profiles are stored under `$XDG_DATA_HOME/pilot/<name>` (default `~/.local/share/pilot/<name>`).                                                                                                                                    |
+| `PILOT_PROFILE_NAME`      | `profile1`                 | Persistent browser profile name. Chrome profiles are stored under `$XDG_DATA_HOME/pilot/<name>` and Firefox profiles under `$XDG_DATA_HOME/pilot/firefox/<name>` (default `XDG_DATA_HOME`: `~/.local/share`).                                                        |
 | `PILOT_RESPONSIVE`        | (preset)                   | Responsive viewport mode. When `true`, the page uses real window dimensions and reflows on resize. Desktop presets default to `true`; mobile/tablet presets leave this unset (locked viewport). Set to `false` to lock the viewport with `setDeviceMetricsOverride`. |
 | `PILOT_CHROME_NO_SANDBOX` | (auto)                     | Force `--no-sandbox` on/off. Accepts `true`/`1` or `false`/`0`. When unset, the flag is auto-applied only when running as root on Linux. See [Chrome sandbox](#chrome-sandbox) below.                                                                                |
 | `PILOT_ALLOWED_ORIGINS`   | (none)                     | Comma-separated origin allow list. Supports wildcards (`*.example.com`). When set, only matching origins can be navigated to.                                                                                                                                        |
@@ -465,25 +472,94 @@ pnpm run test:coverage
 # MCP E2E tests (requires Chrome installed)
 pnpm run test:e2e:mcp
 
+# The same suite against Firefox (requires Firefox installed)
+PILOT_BROWSER=firefox pnpm run test:e2e:mcp
+
 # MCP E2E tests via Docker (no local Chrome needed)
 pnpm run test:e2e:mcp:docker
 ```
 
 ## Browser Support
 
-Pilot drives Chrome today. MCP tools call a browser-agnostic `BrowserDriver`
-(`src/browser/driver/`); `CdpDriver` implements it for Chrome over the Chrome
-DevTools Protocol. Each driver declares capabilities, and a tool whose
-capabilities the active browser lacks fails with
-`<tool> is not supported by <browser>`. `browser_status` reports the driven
-browser as `session.browser`.
+Pilot drives Chrome and Firefox. MCP tools call a browser-agnostic
+`BrowserDriver` (`src/browser/driver/`): `CdpDriver` implements it for Chrome
+over the Chrome DevTools Protocol, and `BidiDriver` for Firefox over
+[WebDriver BiDi](https://w3c.github.io/webdriver-bidi/). Each driver declares
+capabilities, and a tool whose capabilities the active browser lacks fails with
+`<tool> is not supported by <browser> (missing capabilities: ...)`.
+`browser_status` reports the driven browser as `session.browser`.
 
-Planned drivers: Firefox on macOS
-([#58](https://github.com/everydaydevopsio/pilot/issues/58)), Firefox on Linux
-and Windows ([#59](https://github.com/everydaydevopsio/pilot/issues/59)), Safari
-on macOS ([#60](https://github.com/everydaydevopsio/pilot/issues/60)), and
-WebKit via Playwright
-([#61](https://github.com/everydaydevopsio/pilot/issues/61)).
+```mermaid
+flowchart LR
+  Agent -->|MCP| Tools[MCP tools]
+  Tools --> Gate{Capability gate}
+  Gate --> Cdp[CdpDriver] -->|CDP| Chrome
+  Gate --> Bidi[BidiDriver] -->|WebDriver BiDi| Firefox
+```
+
+### Firefox (macOS)
+
+Install stock [Firefox](https://www.mozilla.org/firefox/), then pick it per call
+or for the whole session:
+
+```text
+browser_start { "browser": "firefox", "headless": true }
+```
+
+```bash
+PILOT_BROWSER=firefox npx -y @everydaydevopsio/pilot
+```
+
+Pilot looks for `/Applications/Firefox.app` (and `~/Applications`, Developer
+Edition, and Nightly); set `PILOT_FIREFOX_PATH` or pass `firefoxPath` for
+another install. It launches Firefox with `--remote-debugging-port`,
+`-no-remote`, and a dedicated `-profile` directory per Pilot profile
+(`$XDG_DATA_HOME/pilot/firefox/<profileName>`). Firefox keeps its own
+`.parentlock` file after exit, so Pilot records the running Firefox in
+`pilot.lock` in that directory; `browser_status` and `browser_stop_all` read it.
+`PILOT_HEADLESS=true` adds `--headless`.
+
+To drive a Firefox you started yourself, launch it with a debugging port and
+connect:
+
+```bash
+/Applications/Firefox.app/Contents/MacOS/firefox --remote-debugging-port=9222
+```
+
+```text
+browser_connect { "browser": "firefox", "port": 9222 }
+```
+
+Firefox allows one WebDriver session at a time, so close any other automation
+attached to it first. `browser_stop` ends Pilot's session without closing a
+Firefox that Pilot did not launch.
+
+Linux and Windows Firefox are tracked in
+[#59](https://github.com/everydaydevopsio/pilot/issues/59).
+
+### Capability matrix
+
+| Area                                                       | Chrome (CDP) | Firefox (BiDi)                                                     |
+| ---------------------------------------------------------- | ------------ | ------------------------------------------------------------------ |
+| Tabs, navigation, evaluate, page info, wait                | Yes          | Yes                                                                |
+| Click, type, fill, hover, press key, select, check, scroll | Yes          | Yes (`input.performActions`)                                       |
+| Console and JS errors                                      | Yes          | Yes (`log.entryAdded`)                                             |
+| Network list and request detail                            | Yes          | Yes, including response bodies (BiDi data collectors)              |
+| Screenshot, viewport presets and resize                    | Yes          | Yes (mobile presets set size, DPR, and user agent)                 |
+| Dialogs, uploads, downloads                                | Yes          | Yes                                                                |
+| `browser_snapshot` / `browser_find`                        | Yes          | Yes, from a DOM walk (implicit ARIA roles and accessible names)    |
+| `browser_styles`                                           | Yes          | Computed styles and box model; matched CSS rules are not available |
+| `browser_performance`                                      | Yes          | No: fails with `browser_performance is not supported by firefox`   |
+| `browser_connect` to a running browser                     | Yes          | Yes                                                                |
+
+Firefox has no accessibility tree in BiDi, so its snapshot approximates
+Chrome's: roles, names, and states come from the DOM, and element order follows
+document order. Refs from either browser go stale after navigation.
+
+Planned drivers: Firefox on Linux and Windows
+([#59](https://github.com/everydaydevopsio/pilot/issues/59)), Safari on macOS
+([#60](https://github.com/everydaydevopsio/pilot/issues/60)), and WebKit via
+Playwright ([#61](https://github.com/everydaydevopsio/pilot/issues/61)).
 
 ## Project Structure
 
@@ -491,15 +567,17 @@ WebKit via Playwright
 src/
 ├── browser.ts              # Backward-compatible re-export barrel
 ├── browser/                # Core browser modules
+│   ├── bidi/               # WebDriver BiDi transport, values, keys, network events
 │   ├── browser-manager.ts  # BrowserManager orchestrator
 │   ├── chrome-launcher.ts  # Chrome process management
+│   ├── firefox-launcher.ts # Firefox discovery, profiles, pilot.lock, launch
 │   ├── connection.ts       # CDP connection + reconnect
-│   ├── driver/             # BrowserDriver interface, CdpDriver, capability gating
+│   ├── driver/             # BrowserDriver interface, CdpDriver, BidiDriver, capability gating
 │   ├── events.ts           # CDP event listeners
 │   ├── sessions.ts         # Profile lock status and stop-all
 │   ├── tabs.ts             # Tab management
 │   ├── types.ts            # Shared types
-│   ├── inspect/            # Snapshot, styles, element refs
+│   ├── inspect/            # Snapshot (CDP and DOM-walk), styles, element refs
 │   ├── interaction/        # Dialogs, uploads, downloads, ref resolver
 │   ├── network/            # Network buffer, monitor, header redaction
 │   ├── performance/        # Tracing + analysis

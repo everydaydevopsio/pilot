@@ -5,7 +5,7 @@ import type { ElementRefMap } from './element-ref.js';
  * Default diagnostic properties returned when no filter is specified.
  * Covers the most common layout/visibility debugging needs.
  */
-const DEFAULT_PROPERTIES = new Set([
+export const DEFAULT_PROPERTIES = new Set([
   'display',
   'visibility',
   'opacity',

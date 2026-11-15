@@ -45,7 +45,7 @@ export class DownloadTracker {
   }
 }
 
-function getDownloadDir(): string {
+export function getDownloadDir(): string {
   const env = process.env.PILOT_DOWNLOAD_DIR;
   if (env) return resolve(env);
   return resolve(tmpdir(), 'pilot-downloads');

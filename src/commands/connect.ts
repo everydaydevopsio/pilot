@@ -1,4 +1,8 @@
-import type { BrowserDriver } from '../browser/driver/types.js';
+import {
+  BROWSER_NAMES,
+  type BrowserDriver,
+  type BrowserKind
+} from '../browser/driver/types.js';
 import type { TabInfo } from '../browser/types.js';
 
 export interface ConnectParams {
@@ -7,13 +11,15 @@ export interface ConnectParams {
 }
 
 export interface ConnectResult {
+  /** Browser connected to; defaults to chrome when omitted. */
+  browser?: BrowserKind;
   host: string;
   port: number;
   tabs: TabInfo[];
 }
 
 export async function executeConnect(
-  driver: Pick<BrowserDriver, 'connectExisting'>,
+  driver: Pick<BrowserDriver, 'connectExisting'> & { kind?: BrowserKind },
   params: ConnectParams
 ): Promise<ConnectResult> {
   const host = params.host ?? '127.0.0.1';
@@ -21,12 +27,12 @@ export async function executeConnect(
 
   const { tabs } = await driver.connectExisting({ host, port });
 
-  return { host, port, tabs };
+  return { browser: driver.kind, host, port, tabs };
 }
 
 export function formatConnectResult(result: ConnectResult): string {
   const lines = [
-    `Connected to Chrome at ${result.host}:${result.port}`,
+    `Connected to ${BROWSER_NAMES[result.browser ?? 'chrome']} at ${result.host}:${result.port}`,
     '',
     `Tabs (${result.tabs.length}):`
   ];

@@ -1,6 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createDriver } from '../browser/driver/factory.js';
-import type { BrowserDriver, DriverSession } from '../browser/driver/types.js';
+import type {
+  BrowserDriver,
+  BrowserKind,
+  DriverSession
+} from '../browser/driver/types.js';
 import { ElementRefMap } from '../browser/inspect/element-ref.js';
 import { DialogQueue } from '../browser/interaction/dialogs.js';
 import { DownloadTracker } from '../browser/interaction/downloads.js';
@@ -31,7 +35,8 @@ export interface BrowserContext extends DriverSession {
   baseConfig: McpConfig;
 }
 
-export type DriverFactory = () => BrowserDriver;
+/** Build a driver; without a kind, uses PILOT_BROWSER (default chrome). */
+export type DriverFactory = (kind?: BrowserKind) => BrowserDriver;
 
 /**
  * Register every Pilot tool behind the capability gate, so a tool the active
@@ -75,12 +80,13 @@ export async function createMcpServer(config: McpConfig): Promise<{
     baseConfig: config
   };
 
-  const makeDriver: DriverFactory = () =>
-    createDriver(
-      'chrome',
-      loadConfig({ cdpPort: config.cdpPort, cdpHost: config.cdpHost }),
-      context
-    );
+  const makeDriver: DriverFactory = (kind) => {
+    const driverConfig = loadConfig({
+      cdpPort: config.cdpPort,
+      cdpHost: config.cdpHost
+    });
+    return createDriver(kind ?? driverConfig.browser, driverConfig, context);
+  };
 
   registerAllTools(server, context, makeDriver);
 

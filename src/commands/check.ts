@@ -12,6 +12,21 @@ export interface CheckResult {
   checked: boolean;
 }
 
+/** Sets or toggles a checkbox or radio; shared by every driver. */
+export const TOGGLE_CHECK_FUNCTION = `function(desiredState) {
+      var tag = this.tagName.toLowerCase();
+      var type = (this.type || '').toLowerCase();
+      if (tag !== 'input' || (type !== 'checkbox' && type !== 'radio')) {
+        throw new Error('Element is not a checkbox or radio button');
+      }
+      var current = this.checked;
+      var target = desiredState !== null ? desiredState : !current;
+      if (current !== target) {
+        this.click();
+      }
+      return this.checked;
+    }`;
+
 /**
  * Toggle a checkbox or radio button by ref.
  * If `checked` is specified, sets it to that state (no-op if already matching).
@@ -26,19 +41,7 @@ export async function executeCheck(
 
   const { result, exceptionDetails } = await client.Runtime.callFunctionOn({
     objectId: resolved.objectId,
-    functionDeclaration: `function(desiredState) {
-      var tag = this.tagName.toLowerCase();
-      var type = (this.type || '').toLowerCase();
-      if (tag !== 'input' || (type !== 'checkbox' && type !== 'radio')) {
-        throw new Error('Element is not a checkbox or radio button');
-      }
-      var current = this.checked;
-      var target = desiredState !== null ? desiredState : !current;
-      if (current !== target) {
-        this.click();
-      }
-      return this.checked;
-    }`,
+    functionDeclaration: TOGGLE_CHECK_FUNCTION,
     arguments: [{ value: params.checked ?? null }],
     returnByValue: true,
     awaitPromise: false

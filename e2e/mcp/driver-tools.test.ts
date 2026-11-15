@@ -1,10 +1,15 @@
-import { McpTestClient } from './client.js';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { createServer } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { E2E_BROWSER, McpTestClient } from './client.js';
 import { dataUrl } from './agent-workflows/helpers.js';
 
 /**
  * #62: every browser-dependent tool runs through the BrowserDriver layer.
  * These cover the tools the other E2E suites do not exercise, against the
- * real Chrome driver.
+ * real driver for E2E_BROWSER (#58: PILOT_BROWSER=firefox).
  */
 describe('MCP E2E: driver-backed tools', () => {
   let mcp: McpTestClient;
@@ -32,12 +37,12 @@ describe('MCP E2E: driver-backed tools', () => {
     return ref;
   }
 
-  it('browser_status reports the chrome driver', async () => {
+  it('browser_status reports the active driver', async () => {
     const status = JSON.parse(
       mcp.getText(await mcp.callTool('browser_status'))
     );
     expect(status.session).toMatchObject({
-      browser: 'chrome',
+      browser: E2E_BROWSER,
       mode: 'launched',
       connected: true
     });
@@ -63,6 +68,23 @@ describe('MCP E2E: driver-backed tools', () => {
     const result = await mcp.callTool('browser_press_key', { key: 'Enter' });
     expect(mcp.getText(result)).toBe('Pressed Enter');
     expect(await evaluate('document.title')).toBe('entered');
+  });
+
+  // #58 review: a password field's value must never reach the agent.
+  it('browser_snapshot and browser_find never expose password values', async () => {
+    await mcp.callTool('browser_navigate', {
+      url: dataUrl(`<label>Username <input id="u" /></label>
+        <label>Password <input id="p" type="password" /></label>`)
+    });
+    await evaluate(`document.getElementById('u').value = 'visible-user';
+      document.getElementById('p').value = 's3cret-pw'`);
+    const snapshot = mcp.getText(await mcp.callTool('browser_snapshot'));
+    const found = mcp.getText(
+      await mcp.callTool('browser_find', { name: 'Password' })
+    );
+    expect(snapshot).toContain('visible-user');
+    expect(snapshot).not.toContain('s3cret-pw');
+    expect(found).not.toContain('s3cret-pw');
   });
 
   it('browser_scroll scrolls the page', async () => {
@@ -98,7 +120,56 @@ describe('MCP E2E: driver-backed tools', () => {
     expect(mcp.getText(clear)).toBe('Cleared 0 download records.');
   });
 
-  it('browser_performance traces a navigation', async () => {
+  const chromeOnly = E2E_BROWSER === 'chrome' ? it : it.skip;
+  const firefoxOnly = E2E_BROWSER === 'firefox' ? it : it.skip;
+
+  // #58 AC2: unsupported tools fail with a capability error naming the browser.
+  firefoxOnly('browser_performance is rejected by firefox', async () => {
+    const result = await mcp.callTool('browser_performance', {
+      action: 'start'
+    });
+    expect(result.isError).toBe(true);
+    expect(mcp.getText(result)).toMatch(
+      /browser_performance is not supported by firefox \(missing capabilities: performanceTrace\)/
+    );
+  });
+
+  firefoxOnly('browser_styles reports computed styles only', async () => {
+    await mcp.callTool('browser_navigate', {
+      url: dataUrl('<button style="padding:4px">Styled</button>')
+    });
+    const ref = await refFor({ role: 'button', name: 'Styled' });
+    const text = mcp.getText(
+      await mcp.callTool('browser_styles', {
+        ref,
+        properties: ['padding-top', 'display']
+      })
+    );
+    expect(text).toContain('padding-top: 4px');
+    expect(text).toContain('Box Model:');
+    expect(text).toMatch(/Matched Rules: not available in firefox/);
+  });
+
+  firefoxOnly('browser_network returns a response body', async () => {
+    await mcp.callTool('browser_network', { action: 'clear' });
+    await mcp.callTool('browser_navigate', {
+      url: dataUrl('<h1>Body</h1>')
+    });
+    await mcp.callTool('browser_evaluate', {
+      expression: `fetch('data:application/json,{"ok":true}').then(r => r.text())`
+    });
+    const list = mcp.getText(
+      await mcp.callTool('browser_network', { action: 'list', url: 'json' })
+    );
+    const id = list.match(/\[([^\]]+)\] GET/)?.[1];
+    expect(id).toBeDefined();
+    const detail = mcp.getText(
+      await mcp.callTool('browser_network', { action: 'get', requestId: id })
+    );
+    expect(detail).toContain('{"ok":true}');
+  });
+
+  chromeOnly('browser_performance traces a navigation', async () => {
     const start = await mcp.callTool('browser_performance', {
       action: 'start'
     });
@@ -172,12 +243,101 @@ describe('MCP E2E: browser_connect without a browser', () => {
       port: 1
     });
     expect(result.isError).toBe(true);
+    const name = E2E_BROWSER === 'firefox' ? 'Firefox' : 'Chrome';
     expect(mcp.getText(result)).toMatch(
-      /Could not connect to Chrome at 127\.0\.0\.1:1/
+      new RegExp(`Could not connect to ${name} at 127\\.0\\.0\\.1:1`)
     );
     const status = JSON.parse(
       mcp.getText(await mcp.callTool('browser_status'))
     );
     expect(status.session).toEqual({ mode: 'none', connected: false });
+  });
+});
+
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      server.close(() =>
+        typeof address === 'object' && address
+          ? resolve(address.port)
+          : reject(new Error('no port'))
+      );
+    });
+  });
+}
+
+// #58: browser_connect attaches to a Firefox the user started themselves.
+const describeFirefox = E2E_BROWSER === 'firefox' ? describe : describe.skip;
+
+describeFirefox('MCP E2E: browser_connect to a running Firefox', () => {
+  let mcp: McpTestClient;
+  let firefox: ChildProcess;
+  let profileDir: string;
+  let port: number;
+
+  beforeAll(async () => {
+    port = await freePort();
+    profileDir = mkdtempSync(join(tmpdir(), 'pilot-e2e-ff-'));
+    firefox = spawn(
+      process.env.PILOT_FIREFOX_PATH ??
+        '/Applications/Firefox.app/Contents/MacOS/firefox',
+      [
+        `--remote-debugging-port=${port}`,
+        '-no-remote',
+        '-profile',
+        profileDir,
+        '--headless',
+        'about:blank'
+      ],
+      { stdio: 'ignore' }
+    );
+    mcp = new McpTestClient();
+    await mcp.connect();
+  }, 30000);
+
+  afterAll(async () => {
+    await mcp.stopBrowser();
+    await mcp.close();
+    firefox.kill();
+    rmSync(profileDir, { recursive: true, force: true });
+  });
+
+  it('connects, drives the page, and disconnects without stopping Firefox', async () => {
+    let result = await mcp.callTool('browser_connect', {
+      browser: 'firefox',
+      port
+    });
+    for (let i = 0; i < 40 && result.isError; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      result = await mcp.callTool('browser_connect', {
+        browser: 'firefox',
+        port
+      });
+    }
+    expect(result.isError).toBeFalsy();
+    expect(mcp.getText(result)).toContain(`127.0.0.1:${port}`);
+
+    const status = JSON.parse(
+      mcp.getText(await mcp.callTool('browser_status'))
+    );
+    expect(status.session).toMatchObject({
+      browser: 'firefox',
+      mode: 'external',
+      connected: true,
+      bidiPort: port
+    });
+
+    await mcp.callTool('browser_navigate', {
+      url: dataUrl('<title>External</title>')
+    });
+    const info = JSON.parse(
+      mcp.getText(await mcp.callTool('browser_page_info'))
+    );
+    expect(info.title).toBe('External');
+
+    await mcp.callTool('browser_stop');
+    expect(firefox.exitCode).toBeNull();
   });
 });

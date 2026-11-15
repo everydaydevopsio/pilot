@@ -1,56 +1,69 @@
-# Task: BrowserDriver interface with CdpDriver and capability gating
+# Task: Firefox support on macOS via WebDriver BiDi
 
 ## Context
 
 - Owner: mark
 - Date: 2026-11-04
-- Mode: Autonomous (refactor, no behaviour change for Chrome)
-- PRD Section: Architecture → Browser drivers
-- Issue: https://github.com/everydaydevopsio/pilot/issues/62
+- Mode: Autonomous
+- PRD Section: Architecture → Firefox driver
+- Issue: https://github.com/everydaydevopsio/pilot/issues/58
 
 ## Scope
 
-- In scope: `BrowserDriver` interface, `CdpDriver`, capability model and gate,
-  driver factory, `session.browser` in `browser_status`, tests.
-- Out of scope: Firefox/Safari/WebKit drivers (#58–#61), user-facing browser
-  selection.
+- In scope: `BidiDriver`, BiDi transport, Firefox launcher (profile dir,
+  `pilot.lock`, macOS discovery, `PILOT_FIREFOX_PATH`), `browser` option on
+  `browser_start`/`browser_connect` with `PILOT_BROWSER` default, JS-injected
+  snapshot, Firefox profiles in `browser_status`/`browser_stop_all`, docs.
+- Out of scope: Firefox on Linux/Windows (#59), Safari (#60), WebKit (#61),
+  performance tracing on Firefox.
 
 ## Acceptance Criteria
 
-- AC1: MCP tools do not import `chrome-remote-interface` or receive a CDP client.
-- AC2: `CdpDriver` supports every capability; existing tools behave as before.
-- AC3: Missing capabilities fail with `<tool> is not supported by <browser>`
-  before the driver is called.
-- AC4: `createDriver` builds chrome and links tracking issues for the others.
-- AC5: `browser_status` includes `session.browser`.
-- AC6: Unit tests for driver, gate, factory, and tool delegation; E2E for every
-  browser-dependent tool.
+- AC1: `browser_start({ browser: 'firefox' })` launches Firefox on macOS and
+  every supported tool works end to end.
+- AC2: Unsupported tools return a capability error naming the browser.
+- AC3: E2E suite runs against Firefox with `PILOT_BROWSER=firefox`.
+- AC4: README and docs list the Firefox capability matrix and setup.
 
 ## Execution Checklist
 
-- [x] Driver types, capabilities, factory, `CdpDriver`
-- [x] Port every MCP tool to `requireDriver` + capability gate
-- [x] Unit tests (driver, gate, factory, tools, network, navigate, runtime)
-- [x] E2E suite for previously uncovered tools (`e2e/mcp/driver-tools.test.ts`)
-- [x] PRD and README updated
+- [x] BiDi transport, value conversion, keys, network monitor
+- [x] Firefox launcher and Pilot profile lock
+- [x] `BidiDriver` implementing every capability except `performanceTrace`
+- [x] DOM-walk accessibility snapshot shared for future WebKit driver
+- [x] Browser selection in MCP tools, config, and CLI help
+- [x] Firefox profiles in `browser_status` and `browser_stop_all`
+- [x] Unit tests; E2E suite browser-aware plus Firefox-only cases
+- [x] README, PRD, and skill updated
 
 ## Test Strategy
 
-- Unit: `test/browser/driver/*`, `test/mcp/driver-context.test.ts`,
-  `test/mcp/tools.test.ts`.
-- E2E: full MCP suite against real Chrome, plus `driver-tools.test.ts`.
-- Failure paths: missing capability, no browser, unsupported browser kind,
-  failed connect, invalid tab actions.
-- Requirement-to-test mapping: tests reference `#62 ACn` in describe comments.
+- Unit: `test/browser/driver/bidi-driver.test.ts` (fake transport),
+  `test/browser/bidi/*`, `test/browser/firefox-launcher.test.ts`,
+  `test/browser-sessions.test.ts` (Firefox profiles), factory/config/tools.
+- E2E: full MCP suite with `PILOT_BROWSER=firefox`, plus Firefox-only cases in
+  `e2e/mcp/driver-tools.test.ts` (capability error, styles, response body,
+  `browser_connect` to a user-started Firefox).
+- Failure paths: locked profile, BiDi session refused, unreachable port,
+  optional BiDi commands missing, stale shared ids, blocked origins, timeouts,
+  Firefox that will not exit.
+- Requirement-to-test mapping: tests reference #58 in header comments; AC2 in
+  `driver-tools.test.ts`.
 
 ## Rollback Strategy
 
-- Trigger: any Chrome tool regression after release.
-- Rollback steps: revert the merge commit; no data or config migration.
-- Validation after rollback: E2E suite green.
+- Trigger: Chrome regression or broken Firefox launch after release.
+- Rollback steps: revert the merge commit; Chrome stays the default, so users
+  who never set `browser`/`PILOT_BROWSER` are unaffected.
+- Validation after rollback: Chrome E2E suite green.
 
 ## Outcome
 
-- Result: unit 489 passed, 77.3% line coverage (main: 49.7%); E2E 85 passed.
-- Evidence: `pnpm run test:coverage`, `PILOT_HEADLESS=true pnpm exec jest --config jest.e2e-mcp.config.js`.
-- PRD updates: Architecture → Browser drivers; acceptance criterion 18.
+- Result: unit 577 passed, 83.6% line coverage; E2E Chrome 85 passed (4
+  Firefox-only skipped), E2E Firefox 154 on macOS 88 passed (1 Chrome-only
+  skipped). E2E ran headless; visible Firefox was not exercised by the suite.
+- Evidence: `pnpm run test:coverage`,
+  `PILOT_HEADLESS=true pnpm exec jest --config jest.e2e-mcp.config.js`,
+  `PILOT_BROWSER=firefox PILOT_HEADLESS=true pnpm exec jest --config jest.e2e-mcp.config.js`.
+- PRD updates: Architecture → Browser drivers and Firefox driver; configuration;
+  acceptance criterion 19.
